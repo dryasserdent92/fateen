@@ -22,6 +22,12 @@ export default function Home() {
         >
           أضف مصروف
         </Link>
+        <Link
+          href="/expenses"
+          className="w-full rounded-2xl border-2 border-white bg-transparent px-6 py-4 text-lg font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+        >
+          مصاريفي
+        </Link>
       </div>
     </main>
   );
