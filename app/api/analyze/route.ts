@@ -26,7 +26,16 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: "user",
-          content: `استخرج من هذا النص: اسم المتجر، المبلغ، التاريخ، والتصنيف (مطاعم/قهوة/بنزين/سوبرماركت/تسوق/أخرى). أرجع JSON فقط بهذا الشكل: {"store":"","amount":"","date":"","category":""}. يجب أن يكون التاريخ بصيغة YYYY-MM-DD فقط بدون أي صيغة أخرى. النص: ${smsText}`,
+          content: `استخرج من النص التالي المعلومات المطلوبة وأرجع JSON فقط بهذا الشكل بدون أي نص إضافي:
+{"store":"اسم المتجر","amount":"المبلغ رقم فقط","date":"التاريخ بصيغة YYYY-MM-DD","category":"التصنيف"}
+
+قواعد مهمة:
+- إذا جاء بعد كلمة "من" أو "من محل" أو "من متجر" أو "من مطعم" أو "من كافيه" اسم، فهذا هو اسم المتجر
+- المبلغ: أرجع رقم فقط بدون كلمة ريال
+- التاريخ: إذا لم يذكر تاريخ أرجع null
+- التصنيف: اختر من (مطاعم/قهوة/بنزين/سوبرماركت/تسوق/أخرى)
+
+النص: ${smsText}`,
         },
       ],
     }),
@@ -45,18 +54,22 @@ export async function POST(req: NextRequest) {
   }
 
   const text = data.content?.find((item) => item.type === "text")?.text ?? "";
+  console.log("Claude response:", text);
   const clean = text
     .replace(/```json\n?/g, "")
     .replace(/```\n?/g, "")
     .trim();
   const parsed = JSON.parse(clean);
+  const today = new Date().toISOString().split("T")[0];
+  const normalizedDate =
+    typeof parsed.date === "string" && parsed.date.trim() ? parsed.date : today;
   const amount = parseFloat(parsed.amount?.toString().replace(/[^\d.]/g, "") || "0");
 
   const { error: insertError } = await supabaseAdmin.from("expenses").insert([
     {
       store: parsed.store,
       amount,
-      date: parsed.date,
+      date: normalizedDate,
       category: parsed.category,
     },
   ]);
@@ -66,5 +79,5 @@ export async function POST(req: NextRequest) {
     console.error("Supabase insert error:", insertError);
   }
 
-  return NextResponse.json(parsed);
+  return NextResponse.json({ ...parsed, date: normalizedDate });
 }

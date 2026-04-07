@@ -11,7 +11,7 @@ type ExpenseCategory =
   | "أخرى";
 
 type AnalyzeResponse = {
-  merchantName: string | null;
+  store: string | null;
   amount: number | null;
   date: string | null;
   category: ExpenseCategory;
@@ -119,7 +119,7 @@ export default function AddExpensePage() {
             <div className="space-y-2 text-sm text-gray-800">
               <p>
                 <span className="font-semibold text-[#1D9E75]">المتجر:</span>{" "}
-                {result.merchantName ?? "-"}
+                {result.store ?? "-"}
               </p>
               <p>
                 <span className="font-semibold text-[#1D9E75]">المبلغ:</span>{" "}
