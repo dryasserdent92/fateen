@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "../../../lib/supabase";
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -48,5 +49,22 @@ export async function POST(req: NextRequest) {
     .replace(/```json\n?/g, "")
     .replace(/```\n?/g, "")
     .trim();
-  return NextResponse.json(JSON.parse(clean));
+  const parsed = JSON.parse(clean);
+  const amount = parseFloat(parsed.amount?.toString().replace(/[^\d.]/g, "") || "0");
+
+  const { error: insertError } = await supabaseAdmin.from("expenses").insert([
+    {
+      store: parsed.store,
+      amount,
+      date: parsed.date,
+      category: parsed.category,
+    },
+  ]);
+  console.log("Insert result:", JSON.stringify(insertError));
+
+  if (insertError) {
+    console.error("Supabase insert error:", insertError);
+  }
+
+  return NextResponse.json(parsed);
 }
