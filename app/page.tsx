@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#1D9E75] px-6 font-sans">
@@ -14,12 +16,12 @@ export default function Home() {
           </h1>
         </div>
 
-        <button
-          type="button"
+        <Link
+          href="/add"
           className="w-full rounded-2xl bg-white px-6 py-4 text-lg font-semibold text-[#1D9E75] transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
         >
           أضف مصروف
-        </button>
+        </Link>
       </div>
     </main>
   );
