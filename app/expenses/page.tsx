@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabaseAdmin } from "../../lib/supabase";
+import { supabase } from "../../lib/supabase";
 
 type Expense = {
   id: number | string;
@@ -26,7 +26,7 @@ function formatDate(dateText: string | null): string {
 }
 
 export default async function ExpensesPage() {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from("expenses")
     .select("id,store,amount,date,category")
     .order("date", { ascending: false });
