@@ -28,6 +28,12 @@ export default function Home() {
         >
           مصاريفي
         </Link>
+        <Link
+          href="/login"
+          className="w-full rounded-2xl bg-white/15 px-6 py-4 text-lg font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+        >
+          تسجيل الدخول
+        </Link>
       </div>
     </main>
   );
