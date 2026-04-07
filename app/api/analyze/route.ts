@@ -65,18 +65,17 @@ export async function POST(req: NextRequest) {
     typeof parsed.date === "string" && parsed.date.trim() ? parsed.date : today;
   const amount = parseFloat(parsed.amount?.toString().replace(/[^\d.]/g, "") || "0");
 
-  const { error: insertError } = await supabaseAdmin.from("expenses").insert([
-    {
-      store: parsed.store,
-      amount,
-      date: normalizedDate,
-      category: parsed.category,
-    },
-  ]);
-  console.log("Insert result:", JSON.stringify(insertError));
-
-  if (insertError) {
-    console.error("Supabase insert error:", insertError);
+  if (supabaseAdmin) {
+    const { error: insertError } = await supabaseAdmin.from("expenses").insert([
+      {
+        store: parsed.store,
+        amount,
+        date: normalizedDate,
+        category: parsed.category,
+      },
+    ]);
+    console.log("Insert result:", JSON.stringify(insertError));
+    if (insertError) console.error("Supabase insert error:", insertError);
   }
 
   return NextResponse.json({ ...parsed, date: normalizedDate });
