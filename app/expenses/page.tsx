@@ -2,6 +2,7 @@ import Link from "next/link";
 import { supabaseAdmin } from "../../lib/supabase";
 
 type Expense = {
+  id: number | string;
   store: string | null;
   amount: number | string | null;
   date: string | null;
@@ -27,7 +28,7 @@ function formatDate(dateText: string | null): string {
 export default async function ExpensesPage() {
   const { data, error } = await supabaseAdmin
     .from("expenses")
-    .select("store,amount,date,category")
+    .select("id,store,amount,date,category")
     .order("date", { ascending: false });
 
   const expenses: Expense[] = data ?? [];
@@ -73,8 +74,8 @@ export default async function ExpensesPage() {
               لا توجد مصاريف حتى الآن.
             </div>
           ) : (
-            expenses.map((expense, index) => (
-              <article key={`${expense.store ?? "expense"}-${expense.date ?? index}`} className="rounded-2xl bg-white p-5 shadow">
+            expenses.map((expense) => (
+              <article key={expense.id} className="rounded-2xl bg-white p-5 shadow">
                 <div className="grid gap-2 text-sm sm:grid-cols-2">
                   <p>
                     <span className="font-semibold text-[#1D9E75]">المتجر:</span>{" "}
