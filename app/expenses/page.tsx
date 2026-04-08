@@ -156,12 +156,14 @@ export default function ExpensesPage() {
   }, 0);
 
   /* ملخص التصنيفات */
-  const categoryTotals = expenses.reduce<Record<string, number>>((acc, expense) => {
+  const categoryStats = expenses.reduce<Record<string, { total: number; count: number }>>((acc, expense) => {
     const cat = expense.category ?? "أخرى";
-    acc[cat] = (acc[cat] ?? 0) + toNumber(expense.amount);
+    if (!acc[cat]) acc[cat] = { total: 0, count: 0 };
+    acc[cat]!.total += toNumber(expense.amount);
+    acc[cat]!.count += 1;
     return acc;
   }, {});
-  const sortedCategories = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
+  const sortedCategories = Object.entries(categoryStats).sort((a, b) => b[1].total - a[1].total);
 
   const allSelected = expenses.length > 0 && selected.size === expenses.length;
 
@@ -195,13 +197,18 @@ export default function ExpensesPage() {
               <div className="mt-4 space-y-2">
                 <p className="text-xs font-semibold text-gray-400 px-1">الإجمالي حسب التصنيف</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {sortedCategories.map(([cat, total]) => {
+                  {sortedCategories.map(([cat, { total, count }]) => {
                     const pct = currentMonthTotal > 0 ? (total / currentMonthTotal) * 100 : 0;
                     return (
                       <div key={cat} className="rounded-2xl bg-[#1D9E75]/5 px-3 py-2.5">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="text-base">{CATEGORY_ICONS[cat] ?? "💳"}</span>
-                          <span className="text-xs font-semibold text-gray-600 truncate">{cat}</span>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-base">{CATEGORY_ICONS[cat] ?? "💳"}</span>
+                            <span className="text-xs font-semibold text-gray-600 truncate">{cat}</span>
+                          </div>
+                          <span className="text-xs font-bold text-gray-400 bg-gray-100 rounded-full px-1.5 py-0.5">
+                            {count}×
+                          </span>
                         </div>
                         <p className="text-lg font-extrabold text-[#1D9E75]">
                           {total.toFixed(2)}
