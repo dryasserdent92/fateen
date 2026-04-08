@@ -18,6 +18,14 @@ const INPUT_TABS: { id: InputMethod; label: string; icon: string }[] = [
   { id: "voice", label: "صوت",   icon: "🎤" },
 ];
 
+type ExpenseItem = {
+  name: string;
+  brand: string | null;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+};
+
 type ExtractedExpense = {
   store: string;
   amount: string;
@@ -25,6 +33,7 @@ type ExtractedExpense = {
   category: Category;
   item_name: string;
   item_brand: string;
+  items: ExpenseItem[] | null;
 };
 
 /* ── Web Speech API types ── */
@@ -77,7 +86,7 @@ export default function AddExpensePage() {
   const [error, setError]           = useState<string | null>(null);
   const [expense, setExpense]       = useState<ExtractedExpense>({
     store: "", amount: "", date: new Date().toISOString().split("T")[0]!, category: "أخرى",
-    item_name: "", item_brand: "",
+    item_name: "", item_brand: "", items: null,
   });
 
   /* cleanup on unmount */
@@ -168,6 +177,9 @@ export default function AddExpensePage() {
           category:   (raw["category"] as Category) ?? "أخرى",
           item_name:  String(raw["item_name"]  ?? ""),
           item_brand: String(raw["item_brand"] ?? ""),
+          items:      Array.isArray(raw["items"]) && (raw["items"] as unknown[]).length > 0
+                        ? (raw["items"] as ExpenseItem[])
+                        : null,
         });
       }
       setStep("review");
@@ -196,6 +208,7 @@ export default function AddExpensePage() {
           category:   expense.category,
           item_name:  expense.item_name  || null,
           item_brand: expense.item_brand || null,
+          items:      expense.items ?? null,
         }),
       });
       const data = (await res.json()) as { error?: string };
@@ -216,7 +229,7 @@ export default function AddExpensePage() {
     setTranscript("");
     setError(null);
     stopRecording();
-    setExpense({ store: "", amount: "", date: new Date().toISOString().split("T")[0]!, category: "أخرى", item_name: "", item_brand: "" });
+    setExpense({ store: "", amount: "", date: new Date().toISOString().split("T")[0]!, category: "أخرى", item_name: "", item_brand: "", items: null });
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -409,7 +422,7 @@ export default function AddExpensePage() {
                   <input type="text" value={expense.store}
                     onChange={(e) => setExpense((p) => ({ ...p, store: e.target.value }))}
                     placeholder="مثال: ستاربكس"
-                    className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm outline-none ring-[#1D9E75] focus:ring-2"
+                    className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2"
                   />
                 </div>
 
@@ -418,7 +431,7 @@ export default function AddExpensePage() {
                   <input type="number" step="0.01" min="0" value={expense.amount}
                     onChange={(e) => setExpense((p) => ({ ...p, amount: e.target.value }))}
                     placeholder="0.00"
-                    className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm outline-none ring-[#1D9E75] focus:ring-2"
+                    className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2"
                   />
                 </div>
 
@@ -426,7 +439,7 @@ export default function AddExpensePage() {
                   <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">التاريخ</label>
                   <input type="date" value={expense.date}
                     onChange={(e) => setExpense((p) => ({ ...p, date: e.target.value }))}
-                    className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm outline-none ring-[#1D9E75] focus:ring-2"
+                    className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2"
                   />
                 </div>
 
@@ -434,34 +447,59 @@ export default function AddExpensePage() {
                   <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">التصنيف</label>
                   <select value={expense.category}
                     onChange={(e) => setExpense((p) => ({ ...p, category: e.target.value as Category }))}
-                    className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm outline-none ring-[#1D9E75] focus:ring-2"
+                    className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2"
                   >
                     {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
                 </div>
 
-                {/* ── السلعة والماركة ── */}
-                <div className="rounded-2xl border border-[#1D9E75]/20 bg-[#1D9E75]/3 p-4 space-y-3">
-                  <p className="text-xs font-bold text-[#1D9E75]/70 uppercase tracking-wide">تفاصيل السلعة (اختياري)</p>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">اسم السلعة</label>
-                    <input type="text" value={expense.item_name}
-                      onChange={(e) => setExpense((p) => ({ ...p, item_name: e.target.value }))}
-                      placeholder="مثال: أرز، قهوة، حليب"
-                      className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm outline-none ring-[#1D9E75] focus:ring-2"
-                    />
+                {/* ── الأصناف المتعددة ── */}
+                {expense.items && expense.items.length > 0 ? (
+                  <div className="rounded-2xl border border-[#1D9E75]/20 bg-[#1D9E75]/5 p-4 space-y-2">
+                    <p className="text-xs font-bold text-[#1D9E75] uppercase tracking-wide mb-3">
+                      🛒 الأصناف ({expense.items.length})
+                    </p>
+                    <div className="space-y-2 max-h-56 overflow-y-auto">
+                      {expense.items.map((item, idx) => (
+                        <div key={idx} className="flex items-center justify-between rounded-xl bg-white border border-[#1D9E75]/15 px-3 py-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-800 truncate">{item.name}</p>
+                            {item.brand && <p className="text-xs text-gray-400">{item.brand}</p>}
+                            <p className="text-xs text-gray-400">
+                              {item.quantity} × {item.unit_price.toFixed(2)} ر.س
+                            </p>
+                          </div>
+                          <p className="text-sm font-bold text-[#1D9E75] shrink-0 mr-2">
+                            {item.total_price.toFixed(2)} ر.س
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
+                ) : (
+                  /* ── السلعة والماركة (للمشتريات الأحادية) ── */
+                  <div className="rounded-2xl border border-[#1D9E75]/20 bg-[#1D9E75]/5 p-4 space-y-3">
+                    <p className="text-xs font-bold text-[#1D9E75]/70 uppercase tracking-wide">تفاصيل السلعة (اختياري)</p>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">ماركة السلعة</label>
-                    <input type="text" value={expense.item_brand}
-                      onChange={(e) => setExpense((p) => ({ ...p, item_brand: e.target.value }))}
-                      placeholder="مثال: رز الشعلان، نسكافيه، المراعي"
-                      className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm outline-none ring-[#1D9E75] focus:ring-2"
-                    />
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">اسم السلعة</label>
+                      <input type="text" value={expense.item_name}
+                        onChange={(e) => setExpense((p) => ({ ...p, item_name: e.target.value }))}
+                        placeholder="مثال: أرز، قهوة، حليب"
+                        className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">ماركة السلعة</label>
+                      <input type="text" value={expense.item_brand}
+                        onChange={(e) => setExpense((p) => ({ ...p, item_brand: e.target.value }))}
+                        placeholder="مثال: رز الشعلان، نسكافيه، المراعي"
+                        className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2"
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {error && (
