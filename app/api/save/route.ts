@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 
 export async function POST(req: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const serviceKey = process.env.SUPABASE_SERVICE_KEY;
 
-  if (!supabaseUrl || !serviceKey || !anonKey) {
+  if (!supabaseUrl || !serviceKey) {
     return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
   }
 
   /* استخراج بيانات المصروف من الطلب */
   const body = (await req.json()) as {
+    user_id?: string | null;
     store?: string | null;
     amount?: number;
     date?: string;
@@ -32,32 +30,13 @@ export async function POST(req: NextRequest) {
     }>;
   };
 
+  const userId =
+    typeof body.user_id === "string" && body.user_id.trim() ? body.user_id.trim() : null;
+
   const payloadExpenses =
     Array.isArray(body.expenses) && body.expenses.length > 0
       ? body.expenses
       : [body];
-
-  /* قراءة المستخدم الحالي من جلسة Supabase عبر cookies */
-  let userId: string | null = null;
-  const cookieStore = await cookies();
-  const supabaseAuth = createServerClient(supabaseUrl, anonKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
-        } catch {
-          // Route handlers can ignore cookie set errors in this flow.
-        }
-      },
-    },
-  });
-  const { data: authData } = await supabaseAuth.auth.getUser();
-  userId = authData.user?.id ?? null;
 
   const supabase = createClient(supabaseUrl, serviceKey);
 

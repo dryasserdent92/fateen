@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import AuthGuard from "../components/auth-guard";
+import { supabase } from "../../lib/supabase";
 
 const CATEGORIES = ["مطاعم", "قهوة", "بنزين", "سوبرماركت", "تسوق", "أخرى"] as const;
 type Category = (typeof CATEGORIES)[number];
@@ -198,10 +199,20 @@ export default function AddExpensePage() {
     setError(null);
     setSaving(true);
     try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+      if (authError || !user?.id) {
+        setError("تعذر التحقق من هويتك، سجّل الدخول مجدداً.");
+        return;
+      }
+
       const res = await fetch("/api/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          user_id:    user.id,
           store:      expense.store || null,
           amount:     parseFloat(expense.amount),
           date:       expense.date,
