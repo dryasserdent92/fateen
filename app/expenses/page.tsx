@@ -61,9 +61,23 @@ export default function ExpensesPage() {
   async function fetchExpenses() {
     setLoading(true);
     setError(null);
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      setExpenses([]);
+      setError("تعذر التحقق من المستخدم الحالي.");
+      setLoading(false);
+      return;
+    }
+
     const { data, error: fetchError } = await supabase
       .from("expenses")
       .select("id,store,amount,date,category,item_name,item_brand")
+      .eq("user_id", user.id)
       .order("date", { ascending: false });
     if (fetchError) {
       setError("تعذر تحميل المصاريف.");
