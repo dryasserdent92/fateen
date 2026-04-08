@@ -9,8 +9,57 @@ export async function POST(req: NextRequest) {
 
   const formData = await req.formData();
   const smsText = formData.get("smsText") as string;
-  if (!smsText || !smsText.trim()) {
-    return NextResponse.json({ error: "smsText is required" }, { status: 400 });
+  const image = formData.get("image");
+  const hasSmsText = typeof smsText === "string" && smsText.trim().length > 0;
+  const hasImage = image instanceof File && image.size > 0;
+
+  if (!hasSmsText && !hasImage) {
+    return NextResponse.json({ error: "smsText or image is required" }, { status: 400 });
+  }
+
+  const prompt = `استخرج من النص/الصورة التالية المعلومات المطلوبة وأرجع JSON فقط بهذا الشكل بدون أي نص إضافي:
+{"store":"اسم المتجر","amount":"المبلغ رقم فقط","date":"التاريخ بصيغة YYYY-MM-DD","category":"التصنيف"}
+
+قواعد مهمة:
+- إذا جاء بعد كلمة "من" أو "من محل" أو "من متجر" أو "من مطعم" أو "من كافيه" اسم، فهذا هو اسم المتجر
+- المبلغ: أرجع رقم فقط بدون كلمة ريال
+- التاريخ: إذا لم يذكر تاريخ أرجع null
+- التصنيف: اختر من (مطاعم/قهوة/بنزين/سوبرماركت/تسوق/أخرى)`;
+
+  const content: Array<
+    | { type: "text"; text: string }
+    | {
+        type: "image";
+        source: { type: "base64"; media_type: string; data: string };
+      }
+  > = [];
+
+  if (hasSmsText) {
+    content.push({
+      type: "text",
+      text: `${prompt}\n\nالنص: ${smsText.trim()}`,
+    });
+  } else {
+    content.push({
+      type: "text",
+      text: `${prompt}\n\nالصورة التالية تحتوي على تفاصيل المصروف، استخرج منها البيانات.`,
+    });
+  }
+
+  if (hasImage) {
+    const file = image as File;
+    const mimeType = file.type || "image/jpeg";
+    const bytes = await file.arrayBuffer();
+    const base64 = Buffer.from(bytes).toString("base64");
+
+    content.push({
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: mimeType,
+        data: base64,
+      },
+    });
   }
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -26,16 +75,7 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: "user",
-          content: `استخرج من النص التالي المعلومات المطلوبة وأرجع JSON فقط بهذا الشكل بدون أي نص إضافي:
-{"store":"اسم المتجر","amount":"المبلغ رقم فقط","date":"التاريخ بصيغة YYYY-MM-DD","category":"التصنيف"}
-
-قواعد مهمة:
-- إذا جاء بعد كلمة "من" أو "من محل" أو "من متجر" أو "من مطعم" أو "من كافيه" اسم، فهذا هو اسم المتجر
-- المبلغ: أرجع رقم فقط بدون كلمة ريال
-- التاريخ: إذا لم يذكر تاريخ أرجع null
-- التصنيف: اختر من (مطاعم/قهوة/بنزين/سوبرماركت/تسوق/أخرى)
-
-النص: ${smsText}`,
+          content,
         },
       ],
     }),
