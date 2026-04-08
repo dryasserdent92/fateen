@@ -86,17 +86,31 @@ export async function POST(req: NextRequest) {
   }
 
   const formData = await req.formData();
+  const smsText = formData.get("smsText") as string | null;
   const files = formData.getAll("image");
   const uploadedFiles = files.filter((item): item is File => item instanceof File && item.size > 0);
+  const hasSmsText = typeof smsText === "string" && smsText.trim().length > 0;
 
-  if (uploadedFiles.length === 0) {
-    return NextResponse.json({ error: "image is required" }, { status: 400 });
+  if (!hasSmsText && uploadedFiles.length === 0) {
+    return NextResponse.json({ error: "smsText أو image مطلوب" }, { status: 400 });
   }
 
   const expenses: Array<{ store: string | null; amount: number; date: string; category: string | null }> =
     [];
 
   try {
+    /* تحليل نص SMS أو صوت */
+    if (hasSmsText) {
+      const textExpense = await callClaude(apiKey, [
+        {
+          type: "text",
+          text: `${buildPrompt("النص التالي")}\n\nالنص: ${smsText!.trim()}`,
+        },
+      ]);
+      expenses.push(textExpense);
+    }
+
+    /* تحليل الصور */
     for (const file of uploadedFiles) {
       const mimeType = file.type || "image/jpeg";
       const bytes = await file.arrayBuffer();

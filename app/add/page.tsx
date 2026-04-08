@@ -1,11 +1,22 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import AuthGuard from "../components/auth-guard";
 
 const CATEGORIES = ["مطاعم", "قهوة", "بنزين", "سوبرماركت", "تسوق", "أخرى"] as const;
 type Category = (typeof CATEGORIES)[number];
+type InputMethod = "image" | "sms" | "voice";
+type Step = "input" | "review" | "saved";
+
+const STEPS: Step[] = ["input", "review", "saved"];
+const STEP_LABELS = ["إدخال", "مراجعة", "حفظ"];
+
+const INPUT_TABS: { id: InputMethod; label: string; icon: string }[] = [
+  { id: "image", label: "صورة", icon: "📷" },
+  { id: "sms",   label: "SMS",   icon: "💬" },
+  { id: "voice", label: "صوت",   icon: "🎤" },
+];
 
 type ExtractedExpense = {
   store: string;
@@ -14,50 +25,144 @@ type ExtractedExpense = {
   category: Category;
 };
 
-type Step = "upload" | "review" | "saved";
+/* ── Web Speech API types ── */
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+}
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+interface SpeechRecognitionInstance extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start(): void;
+  stop(): void;
+  onresult: ((e: SpeechRecognitionEvent) => void) | null;
+  onerror: ((e: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+}
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => SpeechRecognitionInstance;
+    webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
+  }
+}
 
-const STEPS: Step[] = ["upload", "review", "saved"];
-const STEP_LABELS = ["رفع", "مراجعة", "حفظ"];
+const VOICE_DURATION = 15; /* ثواني */
 
 export default function AddExpensePage() {
-  const [step, setStep] = useState<Step>("upload");
-  const [file, setFile] = useState<File | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [expense, setExpense] = useState<ExtractedExpense>({
-    store: "",
-    amount: "",
-    date: new Date().toISOString().split("T")[0]!,
-    category: "أخرى",
-  });
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [step, setStep]             = useState<Step>("input");
+  const [method, setMethod]         = useState<InputMethod>("image");
 
-  /* ── Step 1: Analyse only, no save ── */
-  async function handleAnalyze(e: FormEvent) {
-    e.preventDefault();
-    if (!file) { setError("ارفع صورة فاتورة أولاً"); return; }
+  /* image */
+  const [file, setFile]             = useState<File | null>(null);
+  const fileInputRef                = useRef<HTMLInputElement>(null);
+
+  /* sms */
+  const [smsText, setSmsText]       = useState("");
+
+  /* voice */
+  const [recording, setRecording]   = useState(false);
+  const [countdown, setCountdown]   = useState(VOICE_DURATION);
+  const [transcript, setTranscript] = useState("");
+  const recognitionRef              = useRef<SpeechRecognitionInstance | null>(null);
+  const timerRef                    = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /* shared */
+  const [analyzing, setAnalyzing]   = useState(false);
+  const [saving, setSaving]         = useState(false);
+  const [error, setError]           = useState<string | null>(null);
+  const [expense, setExpense]       = useState<ExtractedExpense>({
+    store: "", amount: "", date: new Date().toISOString().split("T")[0]!, category: "أخرى",
+  });
+
+  /* cleanup on unmount */
+  useEffect(() => () => {
+    recognitionRef.current?.stop();
+    if (timerRef.current) clearInterval(timerRef.current);
+  }, []);
+
+  /* ── Voice recording ── */
+  function startRecording() {
+    const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (!SR) { setError("المتصفح لا يدعم التعرف على الصوت، جرب Chrome"); return; }
+
+    setTranscript("");
     setError(null);
+    setCountdown(VOICE_DURATION);
+
+    const recognition = new SR();
+    recognition.lang = "ar-SA";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognitionRef.current = recognition;
+
+    recognition.onresult = (e: SpeechRecognitionEvent) => {
+      let text = "";
+      for (let i = 0; i < e.results.length; i++) {
+        text += e.results[i]![0]!.transcript;
+      }
+      setTranscript(text);
+    };
+
+    recognition.onerror = (e: SpeechRecognitionErrorEvent) => {
+      setError(`خطأ في الميكروفون: ${e.error}`);
+      stopRecording();
+    };
+
+    recognition.start();
+    setRecording(true);
+
+    /* countdown */
+    let remaining = VOICE_DURATION;
+    timerRef.current = setInterval(() => {
+      remaining -= 1;
+      setCountdown(remaining);
+      if (remaining <= 0) stopRecording();
+    }, 1000);
+  }
+
+  function stopRecording() {
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    setRecording(false);
+    setCountdown(VOICE_DURATION);
+  }
+
+  /* ── Analyze ── */
+  async function handleAnalyze() {
+    setError(null);
+
+    /* validation */
+    if (method === "image" && !file)           { setError("ارفع صورة فاتورة أولاً"); return; }
+    if (method === "sms"   && !smsText.trim()) { setError("الصق نص الرسالة أولاً"); return; }
+    if (method === "voice" && !transcript.trim()) { setError("لم يُسجَّل أي كلام، حاول مجدداً"); return; }
+
     setAnalyzing(true);
     try {
       const formData = new FormData();
-      formData.append("image", file);
-      const res = await fetch("/api/analyze", { method: "POST", body: formData });
+      if (method === "image" && file)          formData.append("image", file);
+      if (method === "sms")                    formData.append("smsText", smsText.trim());
+      if (method === "voice")                  formData.append("smsText", transcript.trim());
+
+      const res  = await fetch("/api/analyze", { method: "POST", body: formData });
       const data = (await res.json()) as {
-        expense?: Partial<ExtractedExpense & { amount: number }>;
-        mergedExpense?: Partial<ExtractedExpense & { amount: number }>;
-        expenses?: Partial<ExtractedExpense & { amount: number }>[];
+        expense?: Record<string, unknown>;
+        mergedExpense?: Record<string, unknown>;
+        expenses?: Record<string, unknown>[];
         error?: string;
       };
       if (!res.ok) { setError(data.error ?? "فشل التحليل"); return; }
-      const extracted = data.expense ?? data.mergedExpense ?? (data.expenses?.[0]);
-      if (extracted) {
-        const amt = (extracted as { amount?: number | string }).amount;
+
+      const raw = data.expense ?? data.mergedExpense ?? data.expenses?.[0];
+      if (raw) {
         setExpense({
-          store: (extracted as { store?: string }).store ?? "",
-          amount: amt != null ? String(amt) : "",
-          date: (extracted as { date?: string }).date ?? new Date().toISOString().split("T")[0]!,
-          category: ((extracted as { category?: string }).category as Category) ?? "أخرى",
+          store:    String(raw["store"]    ?? ""),
+          amount:   String(raw["amount"]   ?? ""),
+          date:     String(raw["date"]     ?? new Date().toISOString().split("T")[0]!),
+          category: (raw["category"] as Category) ?? "أخرى",
         });
       }
       setStep("review");
@@ -68,11 +173,10 @@ export default function AddExpensePage() {
     }
   }
 
-  /* ── Step 2: Save after review ── */
+  /* ── Save ── */
   async function handleSave() {
     if (!expense.amount || isNaN(parseFloat(expense.amount))) {
-      setError("أدخل مبلغاً صحيحاً");
-      return;
+      setError("أدخل مبلغاً صحيحاً"); return;
     }
     setError(null);
     setSaving(true);
@@ -81,9 +185,9 @@ export default function AddExpensePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          store: expense.store || null,
-          amount: parseFloat(expense.amount),
-          date: expense.date,
+          store:    expense.store || null,
+          amount:   parseFloat(expense.amount),
+          date:     expense.date,
           category: expense.category,
         }),
       });
@@ -97,16 +201,15 @@ export default function AddExpensePage() {
     }
   }
 
+  /* ── Reset ── */
   function reset() {
-    setStep("upload");
+    setStep("input");
     setFile(null);
+    setSmsText("");
+    setTranscript("");
     setError(null);
-    setExpense({
-      store: "",
-      amount: "",
-      date: new Date().toISOString().split("T")[0]!,
-      category: "أخرى",
-    });
+    stopRecording();
+    setExpense({ store: "", amount: "", date: new Date().toISOString().split("T")[0]!, category: "أخرى" });
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -114,248 +217,268 @@ export default function AddExpensePage() {
 
   return (
     <AuthGuard>
-    <main className="flex min-h-screen items-center justify-center bg-[#1D9E75] px-6 py-10 font-sans">
-      <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-lg sm:p-8">
+      <main className="flex min-h-screen items-center justify-center bg-[#1D9E75] px-6 py-10 font-sans">
+        <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-lg sm:p-8">
 
-        {/* Header */}
-        <div className="mb-6 flex items-center gap-3">
-          {step !== "saved" && (
-            <Link href="/" className="text-2xl leading-none text-[#1D9E75] hover:opacity-70">
-              ←
-            </Link>
-          )}
-          <h1 className="text-2xl font-extrabold text-[#1D9E75]">
-            {step === "upload" && "رفع فاتورة"}
-            {step === "review" && "مراجعة البيانات"}
-            {step === "saved" && "تم الحفظ ✓"}
-          </h1>
-        </div>
-
-        {/* Progress steps */}
-        <div className="mb-8 flex items-center justify-between">
-          {STEPS.map((s, i) => (
-            <div key={s} className="flex flex-1 items-center">
-              <div className="flex flex-col items-center gap-1">
-                <div
-                  className={`flex size-8 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-                    i < currentStepIndex
-                      ? "bg-[#1D9E75]/30 text-[#1D9E75]"
-                      : i === currentStepIndex
-                      ? "bg-[#1D9E75] text-white"
-                      : "bg-gray-100 text-gray-400"
-                  }`}
-                >
-                  {i < currentStepIndex ? "✓" : i + 1}
-                </div>
-                <span
-                  className={`text-xs font-semibold ${
-                    i === currentStepIndex ? "text-[#1D9E75]" : "text-gray-400"
-                  }`}
-                >
-                  {STEP_LABELS[i]}
-                </span>
-              </div>
-              {i < STEPS.length - 1 && (
-                <div
-                  className={`mx-2 mb-4 h-px flex-1 transition-colors ${
-                    i < currentStepIndex ? "bg-[#1D9E75]/40" : "bg-gray-200"
-                  }`}
-                />
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* ── Step 1: Upload ── */}
-        {step === "upload" && (
-          <form onSubmit={handleAnalyze} className="space-y-5">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className={`flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-8 transition-colors ${
-                file
-                  ? "border-[#1D9E75] bg-[#1D9E75]/5"
-                  : "border-[#1D9E75]/40 bg-[#1D9E75]/5 hover:bg-[#1D9E75]/10"
-              }`}
-            >
-              <span className="text-4xl">{file ? "🧾" : "📷"}</span>
-              {file ? (
-                <>
-                  <p className="text-sm font-bold text-[#1D9E75]">✓ {file.name}</p>
-                  <p className="text-xs text-gray-400">اضغط لاستبدال الصورة</p>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm font-bold text-[#1D9E75]">اضغط لرفع صورة الفاتورة</p>
-                  <p className="text-xs text-gray-400">صورة أو PDF</p>
-                </>
-              )}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,application/pdf"
-              className="hidden"
-              onChange={(e) => {
-                const selected = e.target.files?.[0] ?? null;
-                setFile(selected);
-                setError(null);
-              }}
-            />
-
-            {error && (
-              <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
-                {error}
-              </p>
+          {/* Header */}
+          <div className="mb-6 flex items-center gap-3">
+            {step !== "saved" && (
+              <Link href="/" className="text-2xl leading-none text-[#1D9E75] hover:opacity-70">←</Link>
             )}
+            <h1 className="text-2xl font-extrabold text-[#1D9E75]">
+              {step === "input"  && "أضف مصروف"}
+              {step === "review" && "مراجعة البيانات"}
+              {step === "saved"  && "تم الحفظ ✓"}
+            </h1>
+          </div>
 
-            <button
-              type="submit"
-              disabled={analyzing || !file}
-              className="w-full rounded-2xl bg-[#1D9E75] py-4 text-lg font-bold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {analyzing ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="size-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  جاري التحليل...
-                </span>
-              ) : (
-                "تحليل الفاتورة ←"
-              )}
-            </button>
-          </form>
-        )}
-
-        {/* ── Step 2: Review ── */}
-        {step === "review" && (
-          <div className="space-y-5">
-            <p className="text-sm text-gray-500">
-              راجع البيانات المستخرجة وعدّل إذا احتجت، ثم اضغط حفظ
-            </p>
-
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">
-                  اسم المتجر
-                </label>
-                <input
-                  type="text"
-                  value={expense.store}
-                  onChange={(e) => setExpense((p) => ({ ...p, store: e.target.value }))}
-                  placeholder="مثال: ستاربكس"
-                  className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm outline-none ring-[#1D9E75] focus:ring-2"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">
-                  المبلغ (ر.س)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={expense.amount}
-                  onChange={(e) => setExpense((p) => ({ ...p, amount: e.target.value }))}
-                  placeholder="0.00"
-                  className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm outline-none ring-[#1D9E75] focus:ring-2"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">
-                  التاريخ
-                </label>
-                <input
-                  type="date"
-                  value={expense.date}
-                  onChange={(e) => setExpense((p) => ({ ...p, date: e.target.value }))}
-                  className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm outline-none ring-[#1D9E75] focus:ring-2"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">
-                  التصنيف
-                </label>
-                <select
-                  value={expense.category}
-                  onChange={(e) =>
-                    setExpense((p) => ({ ...p, category: e.target.value as Category }))
-                  }
-                  className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm outline-none ring-[#1D9E75] focus:ring-2"
-                >
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {error && (
-              <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
-                {error}
-              </p>
-            )}
-
-            <div className="flex gap-3 pt-1">
-              <button
-                type="button"
-                onClick={reset}
-                className="flex-1 rounded-2xl border-2 border-[#1D9E75] py-3 text-sm font-bold text-[#1D9E75] transition-opacity hover:opacity-70"
-              >
-                ← رجوع
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="flex-[2] rounded-2xl bg-[#1D9E75] py-3 text-lg font-bold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {saving ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    جاري الحفظ...
+          {/* Progress */}
+          <div className="mb-8 flex items-center justify-between">
+            {STEPS.map((s, i) => (
+              <div key={s} className="flex flex-1 items-center">
+                <div className="flex flex-col items-center gap-1">
+                  <div className={`flex size-8 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                    i < currentStepIndex ? "bg-[#1D9E75]/30 text-[#1D9E75]"
+                    : i === currentStepIndex ? "bg-[#1D9E75] text-white"
+                    : "bg-gray-100 text-gray-400"
+                  }`}>
+                    {i < currentStepIndex ? "✓" : i + 1}
+                  </div>
+                  <span className={`text-xs font-semibold ${i === currentStepIndex ? "text-[#1D9E75]" : "text-gray-400"}`}>
+                    {STEP_LABELS[i]}
                   </span>
-                ) : (
-                  "حفظ المصروف ✓"
+                </div>
+                {i < STEPS.length - 1 && (
+                  <div className={`mx-2 mb-4 h-px flex-1 transition-colors ${i < currentStepIndex ? "bg-[#1D9E75]/40" : "bg-gray-200"}`} />
                 )}
-              </button>
-            </div>
+              </div>
+            ))}
           </div>
-        )}
 
-        {/* ── Step 3: Saved ── */}
-        {step === "saved" && (
-          <div className="flex flex-col items-center gap-6 py-4 text-center">
-            <div className="flex size-24 items-center justify-center rounded-full bg-[#1D9E75]/10 text-5xl">
-              ✅
-            </div>
-            <div>
-              <p className="text-2xl font-extrabold text-[#1D9E75]">تم الحفظ!</p>
-              <p className="mt-1 text-sm text-gray-500">تمت إضافة المصروف بنجاح</p>
-            </div>
-            <div className="flex w-full flex-col gap-3">
+          {/* ── Step 1: Input ── */}
+          {step === "input" && (
+            <div className="space-y-5">
+
+              {/* Input method tabs */}
+              <div className="flex rounded-2xl bg-gray-100 p-1">
+                {INPUT_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => { setMethod(tab.id); setError(null); }}
+                    className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-bold transition-all ${
+                      method === tab.id
+                        ? "bg-white text-[#1D9E75] shadow"
+                        : "text-gray-400 hover:text-gray-600"
+                    }`}
+                  >
+                    <span>{tab.icon}</span>
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* ── Image ── */}
+              {method === "image" && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-8 transition-colors ${
+                      file ? "border-[#1D9E75] bg-[#1D9E75]/5" : "border-[#1D9E75]/40 bg-[#1D9E75]/5 hover:bg-[#1D9E75]/10"
+                    }`}
+                  >
+                    <span className="text-4xl">{file ? "🧾" : "📷"}</span>
+                    {file ? (
+                      <>
+                        <p className="text-sm font-bold text-[#1D9E75]">✓ {file.name}</p>
+                        <p className="text-xs text-gray-400">اضغط لاستبدال الصورة</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-bold text-[#1D9E75]">اضغط لرفع صورة الفاتورة</p>
+                        <p className="text-xs text-gray-400">صورة أو PDF</p>
+                      </>
+                    )}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    onChange={(e) => { setFile(e.target.files?.[0] ?? null); setError(null); }}
+                  />
+                </>
+              )}
+
+              {/* ── SMS ── */}
+              {method === "sms" && (
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-400">الصق رسالة البنك أو أي نص يحتوي تفاصيل المصروف</p>
+                  <textarea
+                    rows={5}
+                    value={smsText}
+                    onChange={(e) => { setSmsText(e.target.value); setError(null); }}
+                    placeholder={"مثال:\nتم خصم 24.50 ريال من حسابك لدى ستاربكس بتاريخ 2025/04/08"}
+                    className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm text-gray-800 outline-none ring-[#1D9E75] placeholder:text-gray-300 focus:ring-2"
+                  />
+                </div>
+              )}
+
+              {/* ── Voice ── */}
+              {method === "voice" && (
+                <div className="flex flex-col items-center gap-4">
+                  <p className="text-xs text-gray-400 text-center">
+                    اضغط ابدأ ثم تكلم، فطين سيستمع {VOICE_DURATION} ثانية ويستخرج البيانات
+                  </p>
+
+                  {/* Mic button */}
+                  <button
+                    type="button"
+                    onClick={recording ? stopRecording : startRecording}
+                    className={`relative flex size-24 items-center justify-center rounded-full text-4xl shadow-lg transition-all ${
+                      recording
+                        ? "bg-red-500 text-white animate-pulse"
+                        : "bg-[#1D9E75] text-white hover:opacity-90"
+                    }`}
+                  >
+                    {recording ? "⏹" : "🎤"}
+                    {recording && (
+                      <span className="absolute -top-2 -right-2 flex size-8 items-center justify-center rounded-full bg-white text-sm font-extrabold text-red-500 shadow">
+                        {countdown}
+                      </span>
+                    )}
+                  </button>
+
+                  <p className="text-sm font-semibold text-gray-500">
+                    {recording ? "يستمع... تكلم الآن" : transcript ? "تم التسجيل" : "اضغط للبدء"}
+                  </p>
+
+                  {/* Transcript preview */}
+                  {transcript && (
+                    <div className="w-full rounded-2xl border border-[#1D9E75]/30 bg-[#1D9E75]/5 p-4">
+                      <p className="mb-1 text-xs font-semibold text-[#1D9E75]">ما قلته:</p>
+                      <p className="text-sm text-gray-700">{transcript}</p>
+                      <button
+                        type="button"
+                        onClick={() => { setTranscript(""); setError(null); }}
+                        className="mt-2 text-xs text-red-400 hover:underline"
+                      >
+                        مسح وإعادة التسجيل
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {error && (
+                <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">{error}</p>
+              )}
+
               <button
                 type="button"
-                onClick={reset}
-                className="w-full rounded-2xl bg-[#1D9E75] py-4 text-lg font-bold text-white transition-opacity hover:opacity-90"
+                onClick={() => void handleAnalyze()}
+                disabled={analyzing || recording}
+                className="w-full rounded-2xl bg-[#1D9E75] py-4 text-lg font-bold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                أضف مصروفاً آخر
+                {analyzing ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="size-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    جاري التحليل...
+                  </span>
+                ) : "تحليل ←"}
               </button>
-              <Link
-                href="/expenses"
-                className="block w-full rounded-2xl border-2 border-[#1D9E75] py-4 text-center text-lg font-bold text-[#1D9E75] transition-opacity hover:opacity-90"
-              >
-                عرض مصاريفي
-              </Link>
             </div>
-          </div>
-        )}
-      </div>
-    </main>
+          )}
+
+          {/* ── Step 2: Review ── */}
+          {step === "review" && (
+            <div className="space-y-5">
+              <p className="text-sm text-gray-500">راجع البيانات المستخرجة وعدّل إذا احتجت</p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">اسم المتجر</label>
+                  <input type="text" value={expense.store}
+                    onChange={(e) => setExpense((p) => ({ ...p, store: e.target.value }))}
+                    placeholder="مثال: ستاربكس"
+                    className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm outline-none ring-[#1D9E75] focus:ring-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">المبلغ (ر.س)</label>
+                  <input type="number" step="0.01" min="0" value={expense.amount}
+                    onChange={(e) => setExpense((p) => ({ ...p, amount: e.target.value }))}
+                    placeholder="0.00"
+                    className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm outline-none ring-[#1D9E75] focus:ring-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">التاريخ</label>
+                  <input type="date" value={expense.date}
+                    onChange={(e) => setExpense((p) => ({ ...p, date: e.target.value }))}
+                    className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm outline-none ring-[#1D9E75] focus:ring-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">التصنيف</label>
+                  <select value={expense.category}
+                    onChange={(e) => setExpense((p) => ({ ...p, category: e.target.value as Category }))}
+                    className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm outline-none ring-[#1D9E75] focus:ring-2"
+                  >
+                    {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {error && (
+                <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">{error}</p>
+              )}
+
+              <div className="flex gap-3 pt-1">
+                <button type="button" onClick={reset}
+                  className="flex-1 rounded-2xl border-2 border-[#1D9E75] py-3 text-sm font-bold text-[#1D9E75] transition-opacity hover:opacity-70">
+                  ← رجوع
+                </button>
+                <button type="button" onClick={() => void handleSave()} disabled={saving}
+                  className="flex-[2] rounded-2xl bg-[#1D9E75] py-3 text-lg font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50">
+                  {saving ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      جاري الحفظ...
+                    </span>
+                  ) : "حفظ المصروف ✓"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 3: Saved ── */}
+          {step === "saved" && (
+            <div className="flex flex-col items-center gap-6 py-4 text-center">
+              <div className="flex size-24 items-center justify-center rounded-full bg-[#1D9E75]/10 text-5xl">✅</div>
+              <div>
+                <p className="text-2xl font-extrabold text-[#1D9E75]">تم الحفظ!</p>
+                <p className="mt-1 text-sm text-gray-500">تمت إضافة المصروف بنجاح</p>
+              </div>
+              <div className="flex w-full flex-col gap-3">
+                <button type="button" onClick={reset}
+                  className="w-full rounded-2xl bg-[#1D9E75] py-4 text-lg font-bold text-white transition-opacity hover:opacity-90">
+                  أضف مصروفاً آخر
+                </button>
+                <Link href="/expenses"
+                  className="block w-full rounded-2xl border-2 border-[#1D9E75] py-4 text-center text-lg font-bold text-[#1D9E75] transition-opacity hover:opacity-90">
+                  عرض مصاريفي
+                </Link>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </main>
     </AuthGuard>
   );
 }
