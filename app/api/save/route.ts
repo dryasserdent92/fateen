@@ -15,9 +15,11 @@ export async function POST(req: NextRequest) {
     amount?: number;
     date?: string;
     category?: string;
+    item_name?: string | null;
+    item_brand?: string | null;
   };
 
-  const { store, amount, date, category } = body;
+  const { store, amount, date, category, item_name, item_brand } = body;
 
   if (typeof amount !== "number" || isNaN(amount) || amount < 0) {
     return NextResponse.json({ error: "مبلغ غير صحيح" }, { status: 400 });
@@ -36,11 +38,13 @@ export async function POST(req: NextRequest) {
   const supabase = createClient(supabaseUrl, serviceKey);
 
   const { error: insertError } = await supabase.from("expenses").insert({
-    store: store ?? null,
+    store:      store      ?? null,
     amount,
-    date: date ?? new Date().toISOString().split("T")[0],
-    category: category ?? "أخرى",
-    user_id: userId,
+    date:       date       ?? new Date().toISOString().split("T")[0],
+    category:   category   ?? "أخرى",
+    item_name:  item_name  ?? null,
+    item_brand: item_brand ?? null,
+    user_id:    userId,
   });
 
   if (insertError) {

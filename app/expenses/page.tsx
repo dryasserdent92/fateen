@@ -11,6 +11,8 @@ type Expense = {
   amount: number | null;
   date: string | null;
   category: string | null;
+  item_name: string | null;
+  item_brand: string | null;
 };
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -61,7 +63,7 @@ export default function ExpensesPage() {
     setError(null);
     const { data, error: fetchError } = await supabase
       .from("expenses")
-      .select("id,store,amount,date,category")
+      .select("id,store,amount,date,category,item_name,item_brand")
       .order("date", { ascending: false });
     if (fetchError) {
       setError("تعذر تحميل المصاريف.");
@@ -284,6 +286,11 @@ export default function ExpensesPage() {
                       <p className="truncate font-bold text-gray-800">
                         {expense.store ?? "غير محدد"}
                       </p>
+                      {(expense.item_name || expense.item_brand) && (
+                        <p className="truncate text-xs font-medium text-[#1D9E75]">
+                          {[expense.item_brand, expense.item_name].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
                       <p className="mt-0.5 text-xs text-gray-400">
                         {expense.category ?? "-"} · {formatDate(expense.date)}
                       </p>

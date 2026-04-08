@@ -23,6 +23,8 @@ type ExtractedExpense = {
   amount: string;
   date: string;
   category: Category;
+  item_name: string;
+  item_brand: string;
 };
 
 /* ── Web Speech API types ── */
@@ -75,6 +77,7 @@ export default function AddExpensePage() {
   const [error, setError]           = useState<string | null>(null);
   const [expense, setExpense]       = useState<ExtractedExpense>({
     store: "", amount: "", date: new Date().toISOString().split("T")[0]!, category: "أخرى",
+    item_name: "", item_brand: "",
   });
 
   /* cleanup on unmount */
@@ -159,10 +162,12 @@ export default function AddExpensePage() {
       const raw = data.expense ?? data.mergedExpense ?? data.expenses?.[0];
       if (raw) {
         setExpense({
-          store:    String(raw["store"]    ?? ""),
-          amount:   String(raw["amount"]   ?? ""),
-          date:     String(raw["date"]     ?? new Date().toISOString().split("T")[0]!),
-          category: (raw["category"] as Category) ?? "أخرى",
+          store:      String(raw["store"]      ?? ""),
+          amount:     String(raw["amount"]     ?? ""),
+          date:       String(raw["date"]       ?? new Date().toISOString().split("T")[0]!),
+          category:   (raw["category"] as Category) ?? "أخرى",
+          item_name:  String(raw["item_name"]  ?? ""),
+          item_brand: String(raw["item_brand"] ?? ""),
         });
       }
       setStep("review");
@@ -185,10 +190,12 @@ export default function AddExpensePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          store:    expense.store || null,
-          amount:   parseFloat(expense.amount),
-          date:     expense.date,
-          category: expense.category,
+          store:      expense.store || null,
+          amount:     parseFloat(expense.amount),
+          date:       expense.date,
+          category:   expense.category,
+          item_name:  expense.item_name  || null,
+          item_brand: expense.item_brand || null,
         }),
       });
       const data = (await res.json()) as { error?: string };
@@ -209,7 +216,7 @@ export default function AddExpensePage() {
     setTranscript("");
     setError(null);
     stopRecording();
-    setExpense({ store: "", amount: "", date: new Date().toISOString().split("T")[0]!, category: "أخرى" });
+    setExpense({ store: "", amount: "", date: new Date().toISOString().split("T")[0]!, category: "أخرى", item_name: "", item_brand: "" });
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -431,6 +438,29 @@ export default function AddExpensePage() {
                   >
                     {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
+                </div>
+
+                {/* ── السلعة والماركة ── */}
+                <div className="rounded-2xl border border-[#1D9E75]/20 bg-[#1D9E75]/3 p-4 space-y-3">
+                  <p className="text-xs font-bold text-[#1D9E75]/70 uppercase tracking-wide">تفاصيل السلعة (اختياري)</p>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">اسم السلعة</label>
+                    <input type="text" value={expense.item_name}
+                      onChange={(e) => setExpense((p) => ({ ...p, item_name: e.target.value }))}
+                      placeholder="مثال: أرز، قهوة، حليب"
+                      className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm outline-none ring-[#1D9E75] focus:ring-2"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">ماركة السلعة</label>
+                    <input type="text" value={expense.item_brand}
+                      onChange={(e) => setExpense((p) => ({ ...p, item_brand: e.target.value }))}
+                      placeholder="مثال: رز الشعلان، نسكافيه، المراعي"
+                      className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm outline-none ring-[#1D9E75] focus:ring-2"
+                    />
+                  </div>
                 </div>
               </div>
 

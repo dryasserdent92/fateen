@@ -5,17 +5,21 @@ type ParsedExpense = {
   amount: string | number | null;
   date: string | null;
   category: string | null;
+  item_name: string | null;
+  item_brand: string | null;
 };
 
 function buildPrompt(inputLabel: string): string {
   return `استخرج من ${inputLabel} المعلومات المطلوبة وأرجع JSON فقط بهذا الشكل بدون أي نص إضافي:
-{"store":"اسم المتجر","amount":"المبلغ رقم فقط","date":"التاريخ بصيغة YYYY-MM-DD","category":"التصنيف"}
+{"store":"اسم المتجر","amount":"المبلغ رقم فقط","date":"التاريخ بصيغة YYYY-MM-DD","category":"التصنيف","item_name":"اسم السلعة","item_brand":"ماركة السلعة"}
 
 قواعد مهمة:
-- إذا جاء بعد كلمة "من" أو "من محل" أو "من متجر" أو "من مطعم" أو "من كافيه" اسم، فهذا هو اسم المتجر
-- المبلغ: أرجع رقم فقط بدون كلمة ريال
-- التاريخ: إذا لم يذكر تاريخ أرجع null
-- التصنيف: اختر من (مطاعم/قهوة/بنزين/سوبرماركت/تسوق/أخرى)`;
+- store: اسم المتجر أو المحل (مثل: العثيم، ستاربكس، الدانوب)، null إذا لم يذكر
+- amount: رقم فقط بدون كلمة ريال
+- date: إذا لم يذكر تاريخ أرجع null
+- category: اختر من (مطاعم/قهوة/بنزين/سوبرماركت/تسوق/أخرى)
+- item_name: اسم نوع المنتج أو السلعة بشكل عام (مثل: أرز، قهوة، حليب، بنزين)، null إذا لم يذكر
+- item_brand: الماركة أو العلامة التجارية للمنتج (مثل: رز الشعلان، نسكافيه، المراعي)، null إذا لم يذكر أو كانت غير واضحة`;
 }
 
 function parseClaudeText(text: string): ParsedExpense {
@@ -30,10 +34,12 @@ function normalizeExpense(parsed: ParsedExpense) {
   const amount = parseFloat(parsed.amount?.toString().replace(/[^\d.]/g, "") || "0");
 
   return {
-    store: parsed.store ?? null,
+    store:      parsed.store ?? null,
     amount,
-    date: normalizedDate,
-    category: parsed.category ?? "أخرى",
+    date:       normalizedDate,
+    category:   parsed.category ?? "أخرى",
+    item_name:  parsed.item_name ?? null,
+    item_brand: parsed.item_brand ?? null,
   };
 }
 
