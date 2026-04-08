@@ -17,9 +17,10 @@ export async function POST(req: NextRequest) {
     category?: string;
     item_name?: string | null;
     item_brand?: string | null;
+    items?: unknown[] | null;
   };
 
-  const { store, amount, date, category, item_name, item_brand } = body;
+  const { store, amount, date, category, item_name, item_brand, items } = body;
 
   if (typeof amount !== "number" || isNaN(amount) || amount < 0) {
     return NextResponse.json({ error: "مبلغ غير صحيح" }, { status: 400 });
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
     category:   category   ?? "أخرى",
     item_name:  item_name  ?? null,
     item_brand: item_brand ?? null,
+    items:      items      ?? null,
     user_id:    userId,
   });
 

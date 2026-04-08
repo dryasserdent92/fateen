@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
+type ExpenseItem = {
+  name: string;
+  brand: string | null;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+};
+
 type ParsedExpense = {
   store: string | null;
   amount: string | number | null;
@@ -7,19 +15,21 @@ type ParsedExpense = {
   category: string | null;
   item_name: string | null;
   item_brand: string | null;
+  items: ExpenseItem[] | null;
 };
 
 function buildPrompt(inputLabel: string): string {
   return `استخرج من ${inputLabel} المعلومات المطلوبة وأرجع JSON فقط بهذا الشكل بدون أي نص إضافي:
-{"store":"اسم المتجر","amount":"المبلغ رقم فقط","date":"التاريخ بصيغة YYYY-MM-DD","category":"التصنيف","item_name":"اسم السلعة","item_brand":"ماركة السلعة"}
+{"store":"اسم المتجر","amount":"الإجمالي رقم فقط","date":"YYYY-MM-DD","category":"التصنيف","item_name":"اسم السلعة الرئيسية أو null","item_brand":"الماركة أو null","items":[{"name":"اسم الصنف","brand":"الماركة أو null","quantity":1,"unit_price":0,"total_price":0}] أو null}
 
 قواعد مهمة:
-- store: اسم المتجر أو المحل (مثل: العثيم، ستاربكس، الدانوب)، null إذا لم يذكر
-- amount: رقم فقط بدون كلمة ريال
-- date: إذا لم يذكر تاريخ أرجع null
+- store: اسم المتجر (مثل: العثيم، ستاربكس)، null إذا لم يذكر
+- amount: الإجمالي الكلي رقم فقط بدون كلمة ريال
+- date: null إذا لم يذكر تاريخ
 - category: اختر من (مطاعم/قهوة/بنزين/سوبرماركت/تسوق/أخرى)
-- item_name: اسم نوع المنتج أو السلعة بشكل عام (مثل: أرز، قهوة، حليب، بنزين)، null إذا لم يذكر
-- item_brand: الماركة أو العلامة التجارية للمنتج (مثل: رز الشعلان، نسكافيه، المراعي)، null إذا لم يذكر أو كانت غير واضحة`;
+- item_name + item_brand: للمشتريات أحادية الصنف فقط، null للفواتير متعددة الأصناف
+- items: مصفوفة لكل صنف في الفاتورة (لفواتير السوبر ماركت والمطاعم المتعددة)، null للمشتريات أحادية الصنف
+- في items: اذكر كل صنف باسمه الكامل بما يشمل الحجم أو العدد، واحسب total_price = quantity × unit_price`;
 }
 
 function parseClaudeText(text: string): ParsedExpense {
@@ -40,6 +50,7 @@ function normalizeExpense(parsed: ParsedExpense) {
     category:   parsed.category ?? "أخرى",
     item_name:  parsed.item_name ?? null,
     item_brand: parsed.item_brand ?? null,
+    items:      Array.isArray(parsed.items) && parsed.items.length > 0 ? parsed.items : null,
   };
 }
 
