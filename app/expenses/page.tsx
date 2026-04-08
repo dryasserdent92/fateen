@@ -153,6 +153,14 @@ export default function ExpensesPage() {
     return isCurrentMonth ? sum + toNumber(expense.amount) : sum;
   }, 0);
 
+  /* ملخص التصنيفات */
+  const categoryTotals = expenses.reduce<Record<string, number>>((acc, expense) => {
+    const cat = expense.category ?? "أخرى";
+    acc[cat] = (acc[cat] ?? 0) + toNumber(expense.amount);
+    return acc;
+  }, {});
+  const sortedCategories = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
+
   const allSelected = expenses.length > 0 && selected.size === expenses.length;
 
   return (
@@ -179,6 +187,38 @@ export default function ExpensesPage() {
                 <span className="mr-1 text-lg font-semibold text-gray-400">ر.س</span>
               </p>
             </div>
+
+            {/* ملخص التصنيفات */}
+            {sortedCategories.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-xs font-semibold text-gray-400 px-1">الإجمالي حسب التصنيف</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {sortedCategories.map(([cat, total]) => {
+                    const pct = currentMonthTotal > 0 ? (total / currentMonthTotal) * 100 : 0;
+                    return (
+                      <div key={cat} className="rounded-2xl bg-[#1D9E75]/5 px-3 py-2.5">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-base">{CATEGORY_ICONS[cat] ?? "💳"}</span>
+                          <span className="text-xs font-semibold text-gray-600 truncate">{cat}</span>
+                        </div>
+                        <p className="text-lg font-extrabold text-[#1D9E75]">
+                          {total.toFixed(2)}
+                          <span className="mr-0.5 text-xs font-normal text-gray-400">ر.س</span>
+                        </p>
+                        {/* شريط النسبة */}
+                        <div className="mt-1.5 h-1.5 w-full rounded-full bg-[#1D9E75]/15">
+                          <div
+                            className="h-1.5 rounded-full bg-[#1D9E75]"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <p className="mt-0.5 text-xs text-gray-400">{pct.toFixed(0)}%</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {error && (
               <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
