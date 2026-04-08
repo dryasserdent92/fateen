@@ -5,8 +5,9 @@ import Link from "next/link";
 import { supabase } from "../lib/supabase";
 
 export default function Home() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userName, setUserName]     = useState<string | null>(null);
+  const [isLoggedIn, setIsLoggedIn]     = useState(false);
+  const [userName, setUserName]         = useState<string | null>(null);
+  const [expenseCount, setExpenseCount] = useState<number | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -15,6 +16,12 @@ export default function Home() {
         const meta = data.session.user.user_metadata as Record<string, string> | undefined;
         const name = meta?.["full_name"] ?? meta?.["name"] ?? data.session.user.email?.split("@")[0] ?? null;
         setUserName(name);
+        // جلب عدد المصاريف لمعرفة هل هو مستخدم جديد
+        void supabase
+          .from("expenses")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", data.session.user.id)
+          .then(({ count }) => setExpenseCount(count ?? 0));
       }
     });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -23,8 +30,14 @@ export default function Home() {
         const meta = session.user.user_metadata as Record<string, string> | undefined;
         const name = meta?.["full_name"] ?? meta?.["name"] ?? session.user.email?.split("@")[0] ?? null;
         setUserName(name);
+        void supabase
+          .from("expenses")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", session.user.id)
+          .then(({ count }) => setExpenseCount(count ?? 0));
       } else {
         setUserName(null);
+        setExpenseCount(null);
       }
     });
     return () => listener.subscription.unsubscribe();
@@ -55,10 +68,20 @@ export default function Home() {
         {isLoggedIn && userName && (
           <div className="flex items-center gap-2 rounded-2xl bg-white/20 px-5 py-2.5">
             <span className="text-lg">👋</span>
-            <p className="text-sm font-bold text-white">
-              مرحباً، {userName}
-            </p>
-            <span className="mr-1 rounded-full bg-white/30 px-2 py-0.5 text-xs text-white">مسجّل الدخول</span>
+            <p className="text-sm font-bold text-white">مرحباً، {userName}</p>
+            {expenseCount !== null && expenseCount > 0 && (
+              <span className="mr-1 rounded-full bg-white/30 px-2 py-0.5 text-xs text-white">
+                {expenseCount} مصروف
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* توجيه المستخدم الجديد */}
+        {isLoggedIn && expenseCount === 0 && (
+          <div className="w-full rounded-2xl bg-white/10 border border-white/20 px-5 py-4 text-center">
+            <p className="text-sm font-bold text-white">🚀 ابدأ بتسجيل أول مصروف</p>
+            <p className="mt-1 text-xs text-white/70">ارفع صورة فاتورة أو الصق رسالة بنكية</p>
           </div>
         )}
 
@@ -71,12 +94,15 @@ export default function Home() {
             + أضف مصروف
           </Link>
 
-          <Link
-            href="/expenses"
-            className="w-full rounded-2xl border-2 border-white bg-transparent px-6 py-4 text-lg font-semibold text-white transition-opacity hover:opacity-90"
-          >
-            مصاريفي
-          </Link>
+          {/* زر المصاريف — يظهر فقط إذا عنده مصاريف أو لم نعرف بعد */}
+          {(expenseCount === null || expenseCount > 0) && (
+            <Link
+              href="/expenses"
+              className="w-full rounded-2xl border-2 border-white bg-transparent px-6 py-4 text-lg font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              مصاريفي {expenseCount !== null && expenseCount > 0 ? `(${expenseCount})` : ""}
+            </Link>
+          )}
 
           {isLoggedIn ? (
             <button

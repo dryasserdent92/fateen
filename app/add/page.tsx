@@ -63,6 +63,13 @@ declare global {
 
 const VOICE_DURATION = 15; /* ثواني */
 
+const ANALYZING_MESSAGES = [
+  "🔍 فطين يقرأ فاتورتك...",
+  "✨ يستخرج البيانات...",
+  "🧠 يحلل المعلومات...",
+  "📊 يرتّب النتائج...",
+];
+
 export default function AddExpensePage() {
   const [step, setStep]             = useState<Step>("input");
   const [method, setMethod]         = useState<InputMethod>("image");
@@ -81,10 +88,15 @@ export default function AddExpensePage() {
   const recognitionRef              = useRef<SpeechRecognitionInstance | null>(null);
   const timerRef                    = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  /* analyzing animation */
+  const [analyzeMsg, setAnalyzeMsg] = useState(0);
+  const analyzeMsgRef               = useRef<ReturnType<typeof setInterval> | null>(null);
+
   /* shared */
   const [analyzing, setAnalyzing]   = useState(false);
   const [saving, setSaving]         = useState(false);
   const [error, setError]           = useState<string | null>(null);
+  const [savedAmount, setSavedAmount] = useState<number | null>(null);
   const [expense, setExpense]       = useState<ExtractedExpense>({
     store: "", amount: "", date: new Date().toISOString().split("T")[0]!, category: "أخرى",
     item_name: "", item_brand: "", items: null,
@@ -94,6 +106,7 @@ export default function AddExpensePage() {
   useEffect(() => () => {
     recognitionRef.current?.stop();
     if (timerRef.current) clearInterval(timerRef.current);
+    if (analyzeMsgRef.current) clearInterval(analyzeMsgRef.current);
   }, []);
 
   /* ── Voice recording ── */
@@ -154,6 +167,10 @@ export default function AddExpensePage() {
     if (method === "voice" && !transcript.trim()) { setError("لم يُسجَّل أي كلام، حاول مجدداً"); return; }
 
     setAnalyzing(true);
+    setAnalyzeMsg(0);
+    analyzeMsgRef.current = setInterval(() => {
+      setAnalyzeMsg((prev) => (prev + 1) % ANALYZING_MESSAGES.length);
+    }, 1800);
     try {
       const formData = new FormData();
       if (method === "image" && file)          formData.append("image", file);
@@ -188,6 +205,7 @@ export default function AddExpensePage() {
       setError("حدث خطأ، حاول مجدداً");
     } finally {
       setAnalyzing(false);
+      if (analyzeMsgRef.current) { clearInterval(analyzeMsgRef.current); analyzeMsgRef.current = null; }
     }
   }
 
@@ -224,6 +242,7 @@ export default function AddExpensePage() {
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) { setError(data.error ?? "فشل الحفظ"); return; }
+      setSavedAmount(parseFloat(expense.amount));
       setStep("saved");
     } catch {
       setError("حدث خطأ، حاول مجدداً");
@@ -239,6 +258,7 @@ export default function AddExpensePage() {
     setSmsText("");
     setTranscript("");
     setError(null);
+    setSavedAmount(null);
     stopRecording();
     setExpense({ store: "", amount: "", date: new Date().toISOString().split("T")[0]!, category: "أخرى", item_name: "", item_brand: "", items: null });
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -406,26 +426,37 @@ export default function AddExpensePage() {
                 <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">{error}</p>
               )}
 
-              <button
-                type="button"
-                onClick={() => void handleAnalyze()}
-                disabled={analyzing || recording}
-                className="w-full rounded-2xl bg-[#1D9E75] py-4 text-lg font-bold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {analyzing ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="size-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    جاري التحليل...
-                  </span>
-                ) : "تحليل ←"}
-              </button>
+              {analyzing ? (
+                <div className="w-full rounded-2xl bg-[#1D9E75]/10 border-2 border-[#1D9E75]/20 py-6 flex flex-col items-center gap-3">
+                  <div className="size-10 animate-spin rounded-full border-4 border-[#1D9E75]/30 border-t-[#1D9E75]" />
+                  <p className="text-base font-bold text-[#1D9E75] transition-all">
+                    {ANALYZING_MESSAGES[analyzeMsg]}
+                  </p>
+                  <p className="text-xs text-gray-400">فطين يعمل بذكاء اصطناعي ⚡</p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void handleAnalyze()}
+                  disabled={recording}
+                  className="w-full rounded-2xl bg-[#1D9E75] py-4 text-lg font-bold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  تحليل ←
+                </button>
+              )}
             </div>
           )}
 
           {/* ── Step 2: Review ── */}
           {step === "review" && (
             <div className="space-y-5">
-              <p className="text-sm text-gray-500">راجع البيانات المستخرجة وعدّل إذا احتجت</p>
+              {/* تلميح المراجعة */}
+              <div className="flex items-start gap-2 rounded-2xl bg-[#1D9E75]/8 border border-[#1D9E75]/20 px-4 py-3">
+                <span className="text-lg shrink-0">✅</span>
+                <p className="text-sm text-[#1D9E75] font-medium leading-relaxed">
+                  استخرجنا هذه البيانات تلقائياً — راجعها وعدّل إذا احتجت، ثم اضغط حفظ
+                </p>
+              </div>
 
               <div className="space-y-4">
                 <div>
@@ -433,8 +464,11 @@ export default function AddExpensePage() {
                   <input type="text" value={expense.store}
                     onChange={(e) => setExpense((p) => ({ ...p, store: e.target.value }))}
                     placeholder="مثال: ستاربكس"
-                    className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2"
+                    className={`w-full rounded-xl border p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2 ${
+                      !expense.store ? "border-amber-300 bg-amber-50" : "border-[#1D9E75]/30"
+                    }`}
                   />
+                  {!expense.store && <p className="text-xs text-amber-500 mt-1">⚠️ لم يُتعرَّف على المتجر — يمكنك إدخاله يدوياً</p>}
                 </div>
 
                 <div>
@@ -442,8 +476,11 @@ export default function AddExpensePage() {
                   <input type="number" step="0.01" min="0" value={expense.amount}
                     onChange={(e) => setExpense((p) => ({ ...p, amount: e.target.value }))}
                     placeholder="0.00"
-                    className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2"
+                    className={`w-full rounded-xl border p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2 ${
+                      !expense.amount || expense.amount === "0" ? "border-amber-300 bg-amber-50" : "border-[#1D9E75]/30"
+                    }`}
                   />
+                  {(!expense.amount || expense.amount === "0") && <p className="text-xs text-amber-500 mt-1">⚠️ أدخل المبلغ يدوياً</p>}
                 </div>
 
                 <div>
@@ -537,20 +574,38 @@ export default function AddExpensePage() {
 
           {/* ── Step 3: Saved ── */}
           {step === "saved" && (
-            <div className="flex flex-col items-center gap-6 py-4 text-center">
-              <div className="flex size-24 items-center justify-center rounded-full bg-[#1D9E75]/10 text-5xl">✅</div>
-              <div>
-                <p className="text-2xl font-extrabold text-[#1D9E75]">تم الحفظ!</p>
-                <p className="mt-1 text-sm text-gray-500">تمت إضافة المصروف بنجاح</p>
+            <div className="flex flex-col items-center gap-5 py-2 text-center">
+              {/* أيقونة النجاح */}
+              <div className="flex size-28 items-center justify-center rounded-full bg-[#1D9E75]/10 text-6xl animate-bounce">
+                🎉
               </div>
-              <div className="flex w-full flex-col gap-3">
+
+              <div>
+                <p className="text-2xl font-extrabold text-[#1D9E75]">تم الحفظ بنجاح!</p>
+                <p className="mt-1 text-sm text-gray-400">
+                  {expense.store ? `${expense.store} ·` : ""} تمت الإضافة لسجل مصاريفك
+                </p>
+              </div>
+
+              {/* بطاقة المبلغ */}
+              {savedAmount !== null && (
+                <div className="w-full rounded-2xl bg-[#1D9E75]/8 border border-[#1D9E75]/20 py-4 px-6">
+                  <p className="text-xs font-medium text-gray-400 mb-1">المبلغ المسجّل</p>
+                  <p className="text-4xl font-extrabold text-[#1D9E75]">
+                    {savedAmount.toFixed(2)}
+                    <span className="mr-1 text-lg font-semibold text-gray-400">ر.س</span>
+                  </p>
+                </div>
+              )}
+
+              <div className="flex w-full flex-col gap-3 pt-1">
                 <button type="button" onClick={reset}
                   className="w-full rounded-2xl bg-[#1D9E75] py-4 text-lg font-bold text-white transition-opacity hover:opacity-90">
-                  أضف مصروفاً آخر
+                  + أضف مصروفاً آخر
                 </button>
                 <Link href="/expenses"
                   className="block w-full rounded-2xl border-2 border-[#1D9E75] py-4 text-center text-lg font-bold text-[#1D9E75] transition-opacity hover:opacity-90">
-                  عرض مصاريفي
+                  عرض كل مصاريفي
                 </Link>
               </div>
             </div>
