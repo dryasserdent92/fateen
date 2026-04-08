@@ -18,13 +18,21 @@ export async function POST(req: NextRequest) {
     item_name?: string | null;
     item_brand?: string | null;
     items?: unknown[] | null;
+    expenses?: Array<{
+      store?: string | null;
+      amount?: number;
+      date?: string;
+      category?: string;
+      item_name?: string | null;
+      item_brand?: string | null;
+      items?: unknown[] | null;
+    }>;
   };
 
-  const { store, amount, date, category, item_name, item_brand, items } = body;
-
-  if (typeof amount !== "number" || isNaN(amount) || amount < 0) {
-    return NextResponse.json({ error: "مبلغ غير صحيح" }, { status: 400 });
-  }
+  const payloadExpenses =
+    Array.isArray(body.expenses) && body.expenses.length > 0
+      ? body.expenses
+      : [body];
 
   /* محاولة ربط المصروف بالمستخدم الحالي إن وجد */
   let userId: string | null = null;
@@ -38,21 +46,34 @@ export async function POST(req: NextRequest) {
 
   const supabase = createClient(supabaseUrl, serviceKey);
 
-  const { error: insertError } = await supabase.from("expenses").insert({
-    store:      store      ?? null,
-    amount,
-    date:       date       ?? new Date().toISOString().split("T")[0],
-    category:   category   ?? "أخرى",
-    item_name:  item_name  ?? null,
-    item_brand: item_brand ?? null,
-    items:      items      ?? null,
-    user_id:    userId,
-  });
+  let rows: Array<Record<string, unknown>>;
+  try {
+    rows = payloadExpenses.map((expense) => {
+      const { store, amount, date, category, item_name, item_brand, items } = expense;
+      if (typeof amount !== "number" || isNaN(amount) || amount < 0) {
+        throw new Error("INVALID_AMOUNT");
+      }
+      return {
+        store: store ?? null,
+        amount,
+        date: date ?? new Date().toISOString().split("T")[0],
+        category: category ?? "أخرى",
+        item_name: item_name ?? null,
+        item_brand: item_brand ?? null,
+        items: items ?? null,
+        user_id: userId,
+      };
+    });
+  } catch {
+    return NextResponse.json({ error: "مبلغ غير صحيح" }, { status: 400 });
+  }
+
+  const { error: insertError } = await supabase.from("expenses").insert(rows);
 
   if (insertError) {
     console.error("Supabase insert error:", insertError);
     return NextResponse.json({ error: "فشل الحفظ في قاعدة البيانات" }, { status: 502 });
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, count: rows.length });
 }
