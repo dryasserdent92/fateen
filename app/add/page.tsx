@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import Link from "next/link";
 
 type ExpenseCategory =
   | "مطاعم"
@@ -133,6 +134,33 @@ export default function AddExpensePage() {
                 <span className="font-semibold text-[#1D9E75]">التصنيف:</span>{" "}
                 {result.category}
               </p>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setResult(null);
+                  setError(null);
+                  setSmsText("");
+                  setFile(null);
+                }}
+                className="rounded-xl bg-[#1D9E75] px-4 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
+              >
+                أضف مصروفاً آخر
+              </button>
+              <Link
+                href="/expenses"
+                className="rounded-xl border border-[#1D9E75] px-4 py-3 text-center text-sm font-bold text-[#1D9E75] transition-opacity hover:opacity-90"
+              >
+                عرض مصاريفي
+              </Link>
+              <Link
+                href="/"
+                className="rounded-xl bg-[#1D9E75]/15 px-4 py-3 text-center text-sm font-bold text-[#1D9E75] transition-opacity hover:opacity-90"
+              >
+                الرئيسية
+              </Link>
             </div>
           </section>
         ) : null}
