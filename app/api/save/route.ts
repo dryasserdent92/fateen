@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 
 export async function POST(req: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const serviceKey = process.env.SUPABASE_SERVICE_KEY;
 
-  if (!supabaseUrl || !serviceKey) {
+  if (!supabaseUrl || !serviceKey || !anonKey) {
     return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
   }
 
@@ -34,15 +37,27 @@ export async function POST(req: NextRequest) {
       ? body.expenses
       : [body];
 
-  /* محاولة ربط المصروف بالمستخدم الحالي إن وجد */
+  /* قراءة المستخدم الحالي من جلسة Supabase عبر cookies */
   let userId: string | null = null;
-  const authHeader = req.headers.get("authorization");
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.slice(7);
-    const supabaseAuth = createClient(supabaseUrl, serviceKey);
-    const { data } = await supabaseAuth.auth.getUser(token);
-    userId = data.user?.id ?? null;
-  }
+  const cookieStore = await cookies();
+  const supabaseAuth = createServerClient(supabaseUrl, anonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        } catch {
+          // Route handlers can ignore cookie set errors in this flow.
+        }
+      },
+    },
+  });
+  const { data: authData } = await supabaseAuth.auth.getUser();
+  userId = authData.user?.id ?? null;
 
   const supabase = createClient(supabaseUrl, serviceKey);
 
