@@ -54,6 +54,9 @@ export default function ExpensesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  /* فلتر التصنيف */
+  const [filterCategory, setFilterCategory] = useState<string | null>(null);
+
   /* وضع التحديد المتعدد */
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<number | string>>(new Set());
@@ -92,6 +95,11 @@ export default function ExpensesPage() {
     setLoading(false);
   }
 
+  /* المصاريف المعروضة بعد الفلتر */
+  const visibleExpenses = filterCategory
+    ? expenses.filter((e) => (e.category ?? "أخرى") === filterCategory)
+    : expenses;
+
   function toggleSelectMode() {
     setSelectMode((prev) => !prev);
     setSelected(new Set());
@@ -107,10 +115,10 @@ export default function ExpensesPage() {
   }
 
   function toggleAll() {
-    if (selected.size === expenses.length) {
+    if (selected.size === visibleExpenses.length) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(expenses.map((e) => e.id)));
+      setSelected(new Set(visibleExpenses.map((e) => e.id)));
     }
   }
 
@@ -169,7 +177,7 @@ export default function ExpensesPage() {
   }, {});
   const sortedCategories = Object.entries(categoryStats).sort((a, b) => b[1].total - a[1].total);
 
-  const allSelected = expenses.length > 0 && selected.size === expenses.length;
+  const allSelected = visibleExpenses.length > 0 && selected.size === visibleExpenses.length;
 
   return (
     <AuthGuard>
@@ -211,30 +219,43 @@ export default function ExpensesPage() {
                 <div className="grid grid-cols-2 gap-2">
                   {sortedCategories.map(([cat, { total, count }]) => {
                     const pct = currentMonthTotal > 0 ? (total / currentMonthTotal) * 100 : 0;
+                    const isActive = filterCategory === cat;
                     return (
-                      <div key={cat} className="rounded-2xl bg-[#1D9E75]/5 px-3 py-2.5">
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => {
+                          setFilterCategory(isActive ? null : cat);
+                          setSelectMode(false);
+                          setSelected(new Set());
+                        }}
+                        className={`rounded-2xl px-3 py-2.5 text-right transition-all ${
+                          isActive
+                            ? "bg-[#1D9E75] ring-2 ring-[#1D9E75]"
+                            : "bg-[#1D9E75]/5 hover:bg-[#1D9E75]/10"
+                        }`}
+                      >
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-1.5">
                             <span className="text-base">{CATEGORY_ICONS[cat] ?? "💳"}</span>
-                            <span className="text-xs font-semibold text-gray-600 truncate">{cat}</span>
+                            <span className={`text-xs font-semibold truncate ${isActive ? "text-white" : "text-gray-600"}`}>{cat}</span>
                           </div>
-                          <span className="text-xs font-bold text-gray-400 bg-gray-100 rounded-full px-1.5 py-0.5">
+                          <span className={`text-xs font-bold rounded-full px-1.5 py-0.5 ${isActive ? "bg-white/20 text-white" : "bg-gray-100 text-gray-400"}`}>
                             {count}×
                           </span>
                         </div>
-                        <p className="text-lg font-extrabold text-[#1D9E75]">
+                        <p className={`text-lg font-extrabold ${isActive ? "text-white" : "text-[#1D9E75]"}`}>
                           {total.toFixed(2)}
-                          <span className="mr-0.5 text-xs font-normal text-gray-400">ر.س</span>
+                          <span className={`mr-0.5 text-xs font-normal ${isActive ? "text-white/70" : "text-gray-400"}`}>ر.س</span>
                         </p>
-                        {/* شريط النسبة */}
-                        <div className="mt-1.5 h-1.5 w-full rounded-full bg-[#1D9E75]/15">
+                        <div className={`mt-1.5 h-1.5 w-full rounded-full ${isActive ? "bg-white/20" : "bg-[#1D9E75]/15"}`}>
                           <div
-                            className="h-1.5 rounded-full bg-[#1D9E75]"
+                            className={`h-1.5 rounded-full ${isActive ? "bg-white" : "bg-[#1D9E75]"}`}
                             style={{ width: `${pct}%` }}
                           />
                         </div>
-                        <p className="mt-0.5 text-xs text-gray-400">{pct.toFixed(0)}%</p>
-                      </div>
+                        <p className={`mt-0.5 text-xs ${isActive ? "text-white/70" : "text-gray-400"}`}>{pct.toFixed(0)}%</p>
+                      </button>
                     );
                   })}
                 </div>
@@ -313,20 +334,44 @@ export default function ExpensesPage() {
             )}
           </div>
 
+          {/* شريط الفلتر النشط */}
+          {filterCategory && (
+            <div className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 shadow">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">{CATEGORY_ICONS[filterCategory] ?? "💳"}</span>
+                <div>
+                  <p className="text-sm font-bold text-gray-800">{filterCategory}</p>
+                  <p className="text-xs text-gray-400">{visibleExpenses.length} مصروف</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setFilterCategory(null); setSelectMode(false); setSelected(new Set()); }}
+                className="rounded-xl bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-500 hover:bg-gray-200"
+              >
+                ✕ إلغاء الفلتر
+              </button>
+            </div>
+          )}
+
           {/* Expenses list */}
           <section className="space-y-3">
             {loading ? (
               <div className="flex justify-center py-10">
                 <span className="size-8 animate-spin rounded-full border-4 border-white border-t-transparent" />
               </div>
-            ) : expenses.length === 0 ? (
+            ) : visibleExpenses.length === 0 ? (
               <div className="rounded-2xl bg-white p-8 text-center shadow">
                 <p className="text-4xl">🧾</p>
-                <p className="mt-3 font-semibold text-gray-600">لا توجد مصاريف حتى الآن</p>
-                <p className="mt-1 text-sm text-gray-400">ارفع أول فاتورة وابدأ التتبع</p>
+                <p className="mt-3 font-semibold text-gray-600">
+                  {filterCategory ? `لا توجد مصاريف في ${filterCategory}` : "لا توجد مصاريف حتى الآن"}
+                </p>
+                <p className="mt-1 text-sm text-gray-400">
+                  {filterCategory ? "" : "ارفع أول فاتورة وابدأ التتبع"}
+                </p>
               </div>
             ) : (
-              expenses.map((expense) => {
+              visibleExpenses.map((expense) => {
                 const isSelected = selected.has(expense.id);
                 return (
                   <article
