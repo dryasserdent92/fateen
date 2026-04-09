@@ -200,6 +200,40 @@ export default function ExpensesPage() {
 
   const allSelected = visibleExpenses.length > 0 && selected.size === visibleExpenses.length;
 
+  /* ── تقسيم المصاريف لمجموعات زمنية ── */
+  function getWeekGroup(dateStr: string | null): "هذا الأسبوع" | "الأسبوع الماضي" | "أقدم" {
+    if (!dateStr) return "أقدم";
+    const d    = new Date(`${dateStr}T12:00:00+03:00`);
+    const now  = new Date(new Date().toLocaleString("en-CA", { timeZone: "Asia/Riyadh", hour12: false }));
+    const day  = now.getDay(); // 0=أحد
+    // بداية هذا الأسبوع (الأحد)
+    const startOfThisWeek = new Date(now);
+    startOfThisWeek.setDate(now.getDate() - day);
+    startOfThisWeek.setHours(0, 0, 0, 0);
+    // بداية الأسبوع الماضي
+    const startOfLastWeek = new Date(startOfThisWeek);
+    startOfLastWeek.setDate(startOfThisWeek.getDate() - 7);
+
+    if (d >= startOfThisWeek)  return "هذا الأسبوع";
+    if (d >= startOfLastWeek)  return "الأسبوع الماضي";
+    return "أقدم";
+  }
+
+  type GroupKey = "هذا الأسبوع" | "الأسبوع الماضي" | "أقدم";
+  const GROUP_ORDER: GroupKey[] = ["هذا الأسبوع", "الأسبوع الماضي", "أقدم"];
+  const GROUP_ICONS: Record<GroupKey, string> = {
+    "هذا الأسبوع":    "🗓",
+    "الأسبوع الماضي": "📅",
+    "أقدم":           "🗃",
+  };
+
+  const groupedExpenses = visibleExpenses.reduce<Record<GroupKey, Expense[]>>((acc, e) => {
+    const g = getWeekGroup(e.date);
+    if (!acc[g]) acc[g] = [];
+    acc[g]!.push(e);
+    return acc;
+  }, {} as Record<GroupKey, Expense[]>);
+
   return (
     <AuthGuard>
       <main className="min-h-screen bg-[#1D9E75] px-6 py-10 font-sans">
@@ -392,128 +426,142 @@ export default function ExpensesPage() {
                 </p>
               </div>
             ) : (
-              visibleExpenses.map((expense) => {
-                const isSelected = selected.has(expense.id);
-                const isExpanded = expandedId === expense.id;
-                const hasItems   = Array.isArray(expense.items) && expense.items.length > 0;
-                const hasDetail  = hasItems || expense.item_name || expense.item_brand;
+              GROUP_ORDER.filter((g) => (groupedExpenses[g] ?? []).length > 0).map((group) => (
+                <div key={group} className="space-y-3">
+                  {/* رأس المجموعة */}
+                  <div className="flex items-center gap-2 px-1">
+                    <span className="text-base">{GROUP_ICONS[group]}</span>
+                    <span className="text-sm font-bold text-white">{group}</span>
+                    <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold text-white">
+                      {(groupedExpenses[group] ?? []).length}
+                    </span>
+                  </div>
 
-                return (
-                  <article
-                    key={expense.id}
-                    className={`rounded-2xl bg-white shadow transition-all overflow-hidden ${
-                      isSelected ? "ring-2 ring-[#1D9E75]" : ""
-                    } ${isExpanded ? "ring-1 ring-[#1D9E75]/30" : ""}`}
-                  >
-                    {/* الصف الرئيسي */}
-                    <div
-                      onClick={() => {
-                        if (selectMode) { toggleItem(expense.id); return; }
-                        setExpandedId(isExpanded ? null : expense.id);
-                      }}
-                      className={`flex items-center gap-4 p-4 ${selectMode ? "cursor-pointer" : "cursor-pointer"}`}
-                    >
-                      {/* Checkbox */}
-                      {selectMode && (
-                        <div className={`flex size-6 flex-shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
-                          isSelected ? "border-[#1D9E75] bg-[#1D9E75] text-white" : "border-gray-300"
-                        }`}>
-                          {isSelected && <span className="text-xs font-bold">✓</span>}
-                        </div>
-                      )}
+                  {/* بطاقات المجموعة */}
+                  {(groupedExpenses[group] ?? []).map((expense) => {
+                    const isSelected = selected.has(expense.id);
+                    const isExpanded = expandedId === expense.id;
+                    const hasItems   = Array.isArray(expense.items) && expense.items.length > 0;
+                    const hasDetail  = hasItems || expense.item_name || expense.item_brand;
 
-                      {/* Category icon */}
-                      {!selectMode && (
-                        <div className="flex size-12 flex-shrink-0 items-center justify-center rounded-xl bg-[#1D9E75]/10 text-2xl">
-                          {CATEGORY_ICONS[expense.category ?? "أخرى"] ?? "💳"}
-                        </div>
-                      )}
-
-                      {/* Details */}
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-bold text-gray-800">
-                          {expense.store ?? "غير محدد"}
-                        </p>
-                        {!isExpanded && (expense.item_name || expense.item_brand) && (
-                          <p className="truncate text-xs font-medium text-[#1D9E75]">
-                            {[expense.item_brand, expense.item_name].filter(Boolean).join(" · ")}
-                          </p>
-                        )}
-                        <p className="mt-0.5 text-xs text-gray-400">
-                          {expense.category ?? "-"} · {formatDate(expense.date)}
-                        </p>
-                      </div>
-
-                      {/* Amount + expand indicator */}
-                      <div className="flex flex-shrink-0 flex-col items-end gap-1">
-                        <p className="text-lg font-extrabold text-[#1D9E75]">
-                          {toNumber(expense.amount).toFixed(2)}
-                          <span className="mr-0.5 text-xs font-normal text-gray-400">ر.س</span>
-                        </p>
-                        {!selectMode && (
-                          <span className={`text-xs text-gray-300 transition-transform ${isExpanded ? "rotate-180" : ""}`}>
-                            {hasDetail ? "▼" : "·"}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* التفاصيل الموسّعة */}
-                    {isExpanded && !selectMode && (
-                      <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 space-y-3">
-
-                        {/* السلعة والماركة */}
-                        {(expense.item_name || expense.item_brand) && !hasItems && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">🏷️</span>
-                            <div>
-                              {expense.item_brand && <p className="text-xs font-bold text-gray-700">{expense.item_brand}</p>}
-                              {expense.item_name  && <p className="text-xs text-gray-500">{expense.item_name}</p>}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* الأصناف المتعددة */}
-                        {hasItems && (
-                          <div className="space-y-1">
-                            <p className="text-xs font-bold text-gray-400">🛒 الأصناف</p>
-                            {expense.items!.map((item, idx) => (
-                              <div key={idx} className="flex items-center justify-between rounded-xl bg-white px-3 py-2">
-                                <div className="min-w-0">
-                                  <p className="text-sm font-semibold text-gray-800 truncate">{item.name}</p>
-                                  {item.brand && <p className="text-xs text-gray-400">{item.brand}</p>}
-                                  <p className="text-xs text-gray-400">{item.quantity} × {item.unit_price.toFixed(2)} ر.س</p>
-                                </div>
-                                <p className="text-sm font-bold text-[#1D9E75] shrink-0 mr-2">
-                                  {item.total_price.toFixed(2)} ر.س
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* التاريخ الكامل */}
-                        <div className="flex items-center gap-2 text-xs text-gray-400">
-                          <span>📅</span>
-                          <span>{formatDate(expense.date)}</span>
-                        </div>
-
-                        {/* زر الحذف */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void handleDeleteSingle(expense.id);
+                    return (
+                      <article
+                        key={expense.id}
+                        className={`rounded-2xl bg-white shadow transition-all overflow-hidden ${
+                          isSelected ? "ring-2 ring-[#1D9E75]" : ""
+                        } ${isExpanded ? "ring-1 ring-[#1D9E75]/30" : ""}`}
+                      >
+                        {/* الصف الرئيسي */}
+                        <div
+                          onClick={() => {
+                            if (selectMode) { toggleItem(expense.id); return; }
+                            setExpandedId(isExpanded ? null : expense.id);
                           }}
-                          className="w-full rounded-xl border border-red-200 py-2 text-sm font-bold text-red-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                          className="flex cursor-pointer items-center gap-4 p-4"
                         >
-                          🗑 حذف هذا المصروف
-                        </button>
-                      </div>
-                    )}
-                  </article>
-                );
-              })
+                          {/* Checkbox */}
+                          {selectMode && (
+                            <div className={`flex size-6 flex-shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
+                              isSelected ? "border-[#1D9E75] bg-[#1D9E75] text-white" : "border-gray-300"
+                            }`}>
+                              {isSelected && <span className="text-xs font-bold">✓</span>}
+                            </div>
+                          )}
+
+                          {/* Category icon */}
+                          {!selectMode && (
+                            <div className="flex size-12 flex-shrink-0 items-center justify-center rounded-xl bg-[#1D9E75]/10 text-2xl">
+                              {CATEGORY_ICONS[expense.category ?? "أخرى"] ?? "💳"}
+                            </div>
+                          )}
+
+                          {/* Details */}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-bold text-gray-800">
+                              {expense.store ?? "غير محدد"}
+                            </p>
+                            {!isExpanded && (expense.item_name || expense.item_brand) && (
+                              <p className="truncate text-xs font-medium text-[#1D9E75]">
+                                {[expense.item_brand, expense.item_name].filter(Boolean).join(" · ")}
+                              </p>
+                            )}
+                            <p className="mt-0.5 text-xs text-gray-400">
+                              {expense.category ?? "-"} · {formatDate(expense.date)}
+                            </p>
+                          </div>
+
+                          {/* Amount + expand indicator */}
+                          <div className="flex flex-shrink-0 flex-col items-end gap-1">
+                            <p className="text-lg font-extrabold text-[#1D9E75]">
+                              {toNumber(expense.amount).toFixed(2)}
+                              <span className="mr-0.5 text-xs font-normal text-gray-400">ر.س</span>
+                            </p>
+                            {!selectMode && (
+                              <span className={`text-xs text-gray-300 transition-transform ${isExpanded ? "rotate-180" : ""}`}>
+                                {hasDetail ? "▼" : "·"}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* التفاصيل الموسّعة */}
+                        {isExpanded && !selectMode && (
+                          <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 space-y-3">
+
+                            {/* السلعة والماركة */}
+                            {(expense.item_name || expense.item_brand) && !hasItems && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">🏷️</span>
+                                <div>
+                                  {expense.item_brand && <p className="text-xs font-bold text-gray-700">{expense.item_brand}</p>}
+                                  {expense.item_name  && <p className="text-xs text-gray-500">{expense.item_name}</p>}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* الأصناف المتعددة */}
+                            {hasItems && (
+                              <div className="space-y-1">
+                                <p className="text-xs font-bold text-gray-400">🛒 الأصناف</p>
+                                {expense.items!.map((item, idx) => (
+                                  <div key={idx} className="flex items-center justify-between rounded-xl bg-white px-3 py-2">
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-semibold text-gray-800 truncate">{item.name}</p>
+                                      {item.brand && <p className="text-xs text-gray-400">{item.brand}</p>}
+                                      <p className="text-xs text-gray-400">{item.quantity} × {item.unit_price.toFixed(2)} ر.س</p>
+                                    </div>
+                                    <p className="text-sm font-bold text-[#1D9E75] shrink-0 mr-2">
+                                      {item.total_price.toFixed(2)} ر.س
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* التاريخ الكامل */}
+                            <div className="flex items-center gap-2 text-xs text-gray-400">
+                              <span>📅</span>
+                              <span>{formatDate(expense.date)}</span>
+                            </div>
+
+                            {/* زر الحذف */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleDeleteSingle(expense.id);
+                              }}
+                              className="w-full rounded-xl border border-red-200 py-2 text-sm font-bold text-red-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                            >
+                              🗑 حذف هذا المصروف
+                            </button>
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              ))
             )}
           </section>
         </div>
