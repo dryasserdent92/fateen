@@ -5,6 +5,14 @@ import Link from "next/link";
 import { supabase } from "../../lib/supabase";
 import AuthGuard from "../components/auth-guard";
 
+type ExpenseItem = {
+  name: string;
+  brand: string | null;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+};
+
 type Expense = {
   id: number | string;
   store: string | null;
@@ -13,6 +21,7 @@ type Expense = {
   category: string | null;
   item_name: string | null;
   item_brand: string | null;
+  items: ExpenseItem[] | null;
 };
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -57,6 +66,9 @@ export default function ExpensesPage() {
   /* فلتر التصنيف */
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
 
+  /* التوسيع في المكان */
+  const [expandedId, setExpandedId] = useState<number | string | null>(null);
+
   /* وضع التحديد المتعدد */
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<number | string>>(new Set());
@@ -84,7 +96,7 @@ export default function ExpensesPage() {
 
     const { data, error: fetchError } = await supabase
       .from("expenses")
-      .select("id,store,amount,date,category,item_name,item_brand")
+      .select("id,store,amount,date,category,item_name,item_brand,items")
       .eq("user_id", user.id)
       .order("date", { ascending: false });
     if (fetchError) {
@@ -373,68 +385,123 @@ export default function ExpensesPage() {
             ) : (
               visibleExpenses.map((expense) => {
                 const isSelected = selected.has(expense.id);
+                const isExpanded = expandedId === expense.id;
+                const hasItems   = Array.isArray(expense.items) && expense.items.length > 0;
+                const hasDetail  = hasItems || expense.item_name || expense.item_brand;
+
                 return (
                   <article
                     key={expense.id}
-                    onClick={() => selectMode && toggleItem(expense.id)}
-                    className={`flex items-center gap-4 rounded-2xl bg-white p-4 shadow transition-all ${
-                      selectMode ? "cursor-pointer" : ""
-                    } ${isSelected ? "ring-2 ring-[#1D9E75]" : ""}`}
+                    className={`rounded-2xl bg-white shadow transition-all overflow-hidden ${
+                      isSelected ? "ring-2 ring-[#1D9E75]" : ""
+                    } ${isExpanded ? "ring-1 ring-[#1D9E75]/30" : ""}`}
                   >
-                    {/* Checkbox في وضع التحديد */}
-                    {selectMode && (
-                      <div
-                        className={`flex size-6 flex-shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
-                          isSelected
-                            ? "border-[#1D9E75] bg-[#1D9E75] text-white"
-                            : "border-gray-300"
-                        }`}
-                      >
-                        {isSelected && <span className="text-xs font-bold">✓</span>}
-                      </div>
-                    )}
-
-                    {/* Category icon */}
-                    {!selectMode && (
-                      <div className="flex size-12 flex-shrink-0 items-center justify-center rounded-xl bg-[#1D9E75]/10 text-2xl">
-                        {CATEGORY_ICONS[expense.category ?? "أخرى"] ?? "💳"}
-                      </div>
-                    )}
-
-                    {/* Details */}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-bold text-gray-800">
-                        {expense.store ?? "غير محدد"}
-                      </p>
-                      {(expense.item_name || expense.item_brand) && (
-                        <p className="truncate text-xs font-medium text-[#1D9E75]">
-                          {[expense.item_brand, expense.item_name].filter(Boolean).join(" · ")}
-                        </p>
+                    {/* الصف الرئيسي */}
+                    <div
+                      onClick={() => {
+                        if (selectMode) { toggleItem(expense.id); return; }
+                        setExpandedId(isExpanded ? null : expense.id);
+                      }}
+                      className={`flex items-center gap-4 p-4 ${selectMode ? "cursor-pointer" : "cursor-pointer"}`}
+                    >
+                      {/* Checkbox */}
+                      {selectMode && (
+                        <div className={`flex size-6 flex-shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
+                          isSelected ? "border-[#1D9E75] bg-[#1D9E75] text-white" : "border-gray-300"
+                        }`}>
+                          {isSelected && <span className="text-xs font-bold">✓</span>}
+                        </div>
                       )}
-                      <p className="mt-0.5 text-xs text-gray-400">
-                        {expense.category ?? "-"} · {formatDate(expense.date)}
-                      </p>
+
+                      {/* Category icon */}
+                      {!selectMode && (
+                        <div className="flex size-12 flex-shrink-0 items-center justify-center rounded-xl bg-[#1D9E75]/10 text-2xl">
+                          {CATEGORY_ICONS[expense.category ?? "أخرى"] ?? "💳"}
+                        </div>
+                      )}
+
+                      {/* Details */}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-bold text-gray-800">
+                          {expense.store ?? "غير محدد"}
+                        </p>
+                        {!isExpanded && (expense.item_name || expense.item_brand) && (
+                          <p className="truncate text-xs font-medium text-[#1D9E75]">
+                            {[expense.item_brand, expense.item_name].filter(Boolean).join(" · ")}
+                          </p>
+                        )}
+                        <p className="mt-0.5 text-xs text-gray-400">
+                          {expense.category ?? "-"} · {formatDate(expense.date)}
+                        </p>
+                      </div>
+
+                      {/* Amount + expand indicator */}
+                      <div className="flex flex-shrink-0 flex-col items-end gap-1">
+                        <p className="text-lg font-extrabold text-[#1D9E75]">
+                          {toNumber(expense.amount).toFixed(2)}
+                          <span className="mr-0.5 text-xs font-normal text-gray-400">ر.س</span>
+                        </p>
+                        {!selectMode && (
+                          <span className={`text-xs text-gray-300 transition-transform ${isExpanded ? "rotate-180" : ""}`}>
+                            {hasDetail ? "▼" : "·"}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Amount + single delete */}
-                    <div className="flex flex-shrink-0 flex-col items-end gap-2">
-                      <p className="text-lg font-extrabold text-[#1D9E75]">
-                        {toNumber(expense.amount).toFixed(2)}
-                        <span className="mr-0.5 text-xs font-normal text-gray-400">ر.س</span>
-                      </p>
-                      {!selectMode && (
+                    {/* التفاصيل الموسّعة */}
+                    {isExpanded && !selectMode && (
+                      <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 space-y-3">
+
+                        {/* السلعة والماركة */}
+                        {(expense.item_name || expense.item_brand) && !hasItems && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">🏷️</span>
+                            <div>
+                              {expense.item_brand && <p className="text-xs font-bold text-gray-700">{expense.item_brand}</p>}
+                              {expense.item_name  && <p className="text-xs text-gray-500">{expense.item_name}</p>}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* الأصناف المتعددة */}
+                        {hasItems && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-bold text-gray-400">🛒 الأصناف</p>
+                            {expense.items!.map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between rounded-xl bg-white px-3 py-2">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold text-gray-800 truncate">{item.name}</p>
+                                  {item.brand && <p className="text-xs text-gray-400">{item.brand}</p>}
+                                  <p className="text-xs text-gray-400">{item.quantity} × {item.unit_price.toFixed(2)} ر.س</p>
+                                </div>
+                                <p className="text-sm font-bold text-[#1D9E75] shrink-0 mr-2">
+                                  {item.total_price.toFixed(2)} ر.س
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* التاريخ الكامل */}
+                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                          <span>📅</span>
+                          <span>{formatDate(expense.date)}</span>
+                        </div>
+
+                        {/* زر الحذف */}
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             void handleDeleteSingle(expense.id);
                           }}
-                          className="rounded-lg px-2 py-1 text-xs font-medium text-red-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                          className="w-full rounded-xl border border-red-200 py-2 text-sm font-bold text-red-400 transition-colors hover:bg-red-50 hover:text-red-600"
                         >
-                          حذف
+                          🗑 حذف هذا المصروف
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </article>
                 );
               })
