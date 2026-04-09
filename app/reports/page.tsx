@@ -29,13 +29,21 @@ function toNumber(v: number | string | null): number {
   return 0;
 }
 
-/* تاريخ اليوم بتوقيت السعودية */
+function formatDate(dateText: string | null): string {
+  if (!dateText) return "-";
+  const date = new Date(`${dateText}T12:00:00+03:00`);
+  if (isNaN(date.getTime())) return dateText;
+  return date.toLocaleDateString("ar-EG-u-nu-latn", {
+    month: "short", day: "numeric",
+    timeZone: "Asia/Riyadh", calendar: "gregory",
+  });
+}
+
 function nowSA(): Date {
   const s = new Date().toLocaleString("en-CA", { timeZone: "Asia/Riyadh", hour12: false });
   return new Date(s);
 }
 
-/* آخر N شهر */
 function lastNMonths(n: number) {
   const result: { year: number; month: number; label: string }[] = [];
   const now = nowSA();
@@ -47,10 +55,14 @@ function lastNMonths(n: number) {
 }
 
 export default function ReportsPage() {
-  const [expenses, setExpenses]   = useState<Expense[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const [expenses, setExpenses]           = useState<Expense[]>([]);
+  const [loading, setLoading]             = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<number>(nowSA().getMonth());
   const [selectedYear, setSelectedYear]   = useState<number>(nowSA().getFullYear());
+
+  /* التوسيع في المكان */
+  const [expandedCat, setExpandedCat]     = useState<string | null>(null);
+  const [expandedStore, setExpandedStore] = useState<string | null>(null);
 
   useEffect(() => { void fetchExpenses(); }, []);
 
@@ -59,7 +71,6 @@ export default function ReportsPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setLoading(false); return; }
 
-    /* جلب آخر 6 أشهر */
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
     sixMonthsAgo.setDate(1);
@@ -69,7 +80,7 @@ export default function ReportsPage() {
       .select("id,store,amount,date,category")
       .eq("user_id", user.id)
       .gte("date", sixMonthsAgo.toISOString().split("T")[0]!)
-      .order("date", { ascending: true });
+      .order("date", { ascending: false });
 
     setExpenses(data ?? []);
     setLoading(false);
@@ -77,12 +88,11 @@ export default function ReportsPage() {
 
   const months = lastNMonths(6);
 
-  /* إجماليات كل شهر */
   const monthlyTotals = months.map(({ year, month }) => {
     const total = expenses
       .filter((e) => {
         if (!e.date) return false;
-        const d = new Date(e.date);
+        const d = new Date(`${e.date}T12:00:00+03:00`);
         return d.getFullYear() === year && d.getMonth() === month;
       })
       .reduce((sum, e) => sum + toNumber(e.amount), 0);
@@ -91,48 +101,54 @@ export default function ReportsPage() {
 
   const maxMonthly = Math.max(...monthlyTotals.map((m) => m.total), 1);
 
-  /* مصاريف الشهر المحدد */
   const selectedExpenses = expenses.filter((e) => {
     if (!e.date) return false;
-    const d = new Date(e.date);
+    const d = new Date(`${e.date}T12:00:00+03:00`);
     return d.getFullYear() === selectedYear && d.getMonth() === selectedMonth;
   });
 
   const selectedTotal = selectedExpenses.reduce((sum, e) => sum + toNumber(e.amount), 0);
 
-  /* تصنيفات الشهر المحدد */
-  const categoryStats = selectedExpenses.reduce<Record<string, { total: number; count: number }>>((acc, e) => {
+  const categoryStats = selectedExpenses.reduce<Record<string, { total: number; count: number; items: Expense[] }>>((acc, e) => {
     const cat = e.category ?? "أخرى";
-    if (!acc[cat]) acc[cat] = { total: 0, count: 0 };
+    if (!acc[cat]) acc[cat] = { total: 0, count: 0, items: [] };
     acc[cat]!.total += toNumber(e.amount);
     acc[cat]!.count += 1;
+    acc[cat]!.items.push(e);
     return acc;
   }, {});
   const sortedCats = Object.entries(categoryStats).sort((a, b) => b[1].total - a[1].total);
 
-  /* أكثر متاجر */
-  const storeStats = selectedExpenses.reduce<Record<string, { total: number; count: number }>>((acc, e) => {
+  const storeStats = selectedExpenses.reduce<Record<string, { total: number; count: number; items: Expense[] }>>((acc, e) => {
     const s = e.store ?? "غير محدد";
-    if (!acc[s]) acc[s] = { total: 0, count: 0 };
+    if (!acc[s]) acc[s] = { total: 0, count: 0, items: [] };
     acc[s]!.total += toNumber(e.amount);
     acc[s]!.count += 1;
+    acc[s]!.items.push(e);
     return acc;
   }, {});
   const topStores = Object.entries(storeStats).sort((a, b) => b[1].total - a[1].total).slice(0, 5);
 
-  /* مقارنة مع الشهر السابق */
   const prevMonth = selectedMonth === 0 ? 11 : selectedMonth - 1;
   const prevYear  = selectedMonth === 0 ? selectedYear - 1 : selectedYear;
   const prevTotal = expenses
     .filter((e) => {
       if (!e.date) return false;
-      const d = new Date(e.date);
+      const d = new Date(`${e.date}T12:00:00+03:00`);
       return d.getFullYear() === prevYear && d.getMonth() === prevMonth;
     })
     .reduce((sum, e) => sum + toNumber(e.amount), 0);
 
-  const diff = selectedTotal - prevTotal;
+  const diff    = selectedTotal - prevTotal;
   const diffPct = prevTotal > 0 ? Math.abs((diff / prevTotal) * 100) : null;
+
+  /* عند تغيير الشهر نغلق التوسيع */
+  function selectMonth(year: number, month: number) {
+    setSelectedMonth(month);
+    setSelectedYear(year);
+    setExpandedCat(null);
+    setExpandedStore(null);
+  }
 
   return (
     <AuthGuard>
@@ -153,7 +169,7 @@ export default function ReportsPage() {
             </div>
           ) : (
             <>
-              {/* ── مخطط الأشهر الستة ── */}
+              {/* ── مخطط الأشهر ── */}
               <div className="rounded-3xl bg-white p-5 shadow-lg">
                 <p className="mb-4 text-sm font-bold text-gray-500">الإنفاق خلال 6 أشهر</p>
                 <div className="flex items-end justify-between gap-1.5 h-36">
@@ -161,24 +177,16 @@ export default function ReportsPage() {
                     const heightPct = maxMonthly > 0 ? (total / maxMonthly) * 100 : 0;
                     const isSelected = month === selectedMonth && year === selectedYear;
                     return (
-                      <button
-                        key={`${year}-${month}`}
-                        type="button"
-                        onClick={() => { setSelectedMonth(month); setSelectedYear(year); }}
-                        className="flex flex-1 flex-col items-center gap-1 group"
-                      >
-                        {/* القيمة */}
-                        <span className={`text-xs font-bold transition-colors ${isSelected ? "text-[#1D9E75]" : "text-gray-300"}`}>
+                      <button key={`${year}-${month}`} type="button"
+                        onClick={() => selectMonth(year, month)}
+                        className="flex flex-1 flex-col items-center gap-1 group">
+                        <span className={`text-xs font-bold ${isSelected ? "text-[#1D9E75]" : "text-gray-300"}`}>
                           {total > 0 ? total.toFixed(0) : ""}
                         </span>
-                        {/* الشريط */}
                         <div className="w-full flex items-end justify-center" style={{ height: "90px" }}>
-                          <div
-                            className={`w-full rounded-t-xl transition-all ${isSelected ? "bg-[#1D9E75]" : "bg-[#1D9E75]/20 group-hover:bg-[#1D9E75]/40"}`}
-                            style={{ height: `${Math.max(heightPct, total > 0 ? 5 : 0)}%` }}
-                          />
+                          <div className={`w-full rounded-t-xl transition-all ${isSelected ? "bg-[#1D9E75]" : "bg-[#1D9E75]/20 group-hover:bg-[#1D9E75]/40"}`}
+                            style={{ height: `${Math.max(heightPct, total > 0 ? 5 : 0)}%` }} />
                         </div>
-                        {/* الشهر */}
                         <span className={`text-xs font-semibold ${isSelected ? "text-[#1D9E75]" : "text-gray-400"}`}>
                           {label.slice(0, 3)}
                         </span>
@@ -189,7 +197,7 @@ export default function ReportsPage() {
                 <p className="mt-2 text-center text-xs text-gray-400">اضغط على أي شهر لعرض تفاصيله</p>
               </div>
 
-              {/* ── ملخص الشهر المحدد ── */}
+              {/* ── ملخص الشهر ── */}
               <div className="rounded-3xl bg-white p-5 shadow-lg">
                 <div className="flex items-start justify-between">
                   <div>
@@ -199,7 +207,6 @@ export default function ReportsPage() {
                       <span className="mr-1 text-lg font-semibold text-gray-400">ر.س</span>
                     </p>
                   </div>
-                  {/* مقارنة مع الشهر السابق */}
                   {prevTotal > 0 && (
                     <div className={`rounded-2xl px-3 py-2 text-center ${diff > 0 ? "bg-red-50" : "bg-green-50"}`}>
                       <p className={`text-lg font-extrabold ${diff > 0 ? "text-red-500" : "text-green-600"}`}>
@@ -212,61 +219,120 @@ export default function ReportsPage() {
                 <p className="mt-1 text-xs text-gray-400">{selectedExpenses.length} عملية</p>
               </div>
 
-              {/* ── التصنيفات ── */}
+              {/* ── التصنيفات — قابلة للتوسيع ── */}
               {sortedCats.length > 0 && (
-                <div className="rounded-3xl bg-white p-5 shadow-lg space-y-3">
-                  <p className="text-sm font-bold text-gray-500">الإنفاق حسب التصنيف</p>
-                  {sortedCats.map(([cat, { total, count }]) => {
-                    const pct = selectedTotal > 0 ? (total / selectedTotal) * 100 : 0;
+                <div className="rounded-3xl bg-white p-5 shadow-lg space-y-1">
+                  <p className="mb-3 text-sm font-bold text-gray-500">الإنفاق حسب التصنيف</p>
+                  {sortedCats.map(([cat, { total, count, items }]) => {
+                    const pct       = selectedTotal > 0 ? (total / selectedTotal) * 100 : 0;
+                    const isOpen    = expandedCat === cat;
                     return (
-                      <div key={cat}>
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <span>{CATEGORY_ICONS[cat] ?? "💳"}</span>
-                            <span className="text-sm font-semibold text-gray-700">{cat}</span>
-                            <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-1.5 py-0.5">{count}×</span>
+                      <div key={cat} className="rounded-2xl overflow-hidden">
+                        {/* رأس التصنيف */}
+                        <button
+                          type="button"
+                          onClick={() => setExpandedCat(isOpen ? null : cat)}
+                          className={`w-full px-3 py-3 transition-colors ${isOpen ? "bg-[#1D9E75]/8" : "hover:bg-gray-50"}`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span>{CATEGORY_ICONS[cat] ?? "💳"}</span>
+                              <span className="text-sm font-semibold text-gray-700">{cat}</span>
+                              <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-1.5 py-0.5">{count}×</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-extrabold text-[#1D9E75]">
+                                {total.toFixed(2)} <span className="text-xs font-normal text-gray-400">ر.س</span>
+                              </span>
+                              <span className={`text-xs text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}>▼</span>
+                            </div>
                           </div>
-                          <span className="text-sm font-extrabold text-[#1D9E75]">
-                            {total.toFixed(2)} <span className="text-xs font-normal text-gray-400">ر.س</span>
-                          </span>
-                        </div>
-                        <div className="h-2 w-full rounded-full bg-gray-100">
-                          <div
-                            className="h-2 rounded-full bg-[#1D9E75] transition-all"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <p className="mt-0.5 text-right text-xs text-gray-400">{pct.toFixed(0)}%</p>
+                          <div className="h-2 w-full rounded-full bg-gray-100">
+                            <div className="h-2 rounded-full bg-[#1D9E75] transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                          <p className="mt-1 text-right text-xs text-gray-400">{pct.toFixed(0)}%</p>
+                        </button>
+
+                        {/* قائمة المصاريف داخل التصنيف */}
+                        {isOpen && (
+                          <div className="border-t border-[#1D9E75]/10 bg-[#1D9E75]/4 divide-y divide-gray-100">
+                            {items.map((e) => (
+                              <div key={e.id} className="flex items-center justify-between px-4 py-2.5">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold text-gray-800 truncate">{e.store ?? "غير محدد"}</p>
+                                  <p className="text-xs text-gray-400">{formatDate(e.date)}</p>
+                                </div>
+                                <p className="text-sm font-extrabold text-[#1D9E75] shrink-0 mr-3">
+                                  {toNumber(e.amount).toFixed(2)}
+                                  <span className="text-xs font-normal text-gray-400"> ر.س</span>
+                                </p>
+                              </div>
+                            ))}
+                            <div className="flex justify-end px-4 py-2">
+                              <Link href="/add"
+                                className="text-xs font-bold text-[#1D9E75] hover:underline">
+                                + أضف مصروف {cat}
+                              </Link>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               )}
 
-              {/* ── أكثر المتاجر ── */}
+              {/* ── أكثر المتاجر — قابلة للتوسيع ── */}
               {topStores.length > 0 && (
-                <div className="rounded-3xl bg-white p-5 shadow-lg space-y-3">
-                  <p className="text-sm font-bold text-gray-500">أكثر المتاجر إنفاقاً</p>
-                  {topStores.map(([store, { total, count }], i) => (
-                    <div key={store} className="flex items-center gap-3">
-                      <span className={`flex size-7 items-center justify-center rounded-full text-xs font-extrabold text-white ${
-                        i === 0 ? "bg-yellow-400" : i === 1 ? "bg-gray-400" : "bg-orange-300"
-                      }`}>
-                        {i + 1}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-gray-800 truncate">{store}</p>
-                        <p className="text-xs text-gray-400">{count} {count === 1 ? "مرة" : "مرات"}</p>
+                <div className="rounded-3xl bg-white p-5 shadow-lg space-y-1">
+                  <p className="mb-3 text-sm font-bold text-gray-500">أكثر المتاجر إنفاقاً</p>
+                  {topStores.map(([store, { total, count, items }], i) => {
+                    const isOpen = expandedStore === store;
+                    return (
+                      <div key={store} className="rounded-2xl overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedStore(isOpen ? null : store)}
+                          className={`w-full flex items-center gap-3 px-3 py-3 transition-colors ${isOpen ? "bg-[#1D9E75]/8" : "hover:bg-gray-50"}`}
+                        >
+                          <span className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-extrabold text-white ${
+                            i === 0 ? "bg-yellow-400" : i === 1 ? "bg-gray-400" : "bg-orange-300"
+                          }`}>{i + 1}</span>
+                          <div className="flex-1 min-w-0 text-right">
+                            <p className="text-sm font-bold text-gray-800 truncate">{store}</p>
+                            <p className="text-xs text-gray-400">{count} {count === 1 ? "مرة" : "مرات"}</p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <p className="text-sm font-extrabold text-[#1D9E75]">
+                              {total.toFixed(2)} <span className="text-xs font-normal text-gray-400">ر.س</span>
+                            </p>
+                            <span className={`text-xs text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}>▼</span>
+                          </div>
+                        </button>
+
+                        {isOpen && (
+                          <div className="border-t border-[#1D9E75]/10 bg-[#1D9E75]/4 divide-y divide-gray-100">
+                            {items.map((e) => (
+                              <div key={e.id} className="flex items-center justify-between px-4 py-2.5">
+                                <div className="min-w-0">
+                                  <p className="text-xs text-gray-500">{e.category ?? "أخرى"}</p>
+                                  <p className="text-xs text-gray-400">{formatDate(e.date)}</p>
+                                </div>
+                                <p className="text-sm font-extrabold text-[#1D9E75] shrink-0">
+                                  {toNumber(e.amount).toFixed(2)}
+                                  <span className="text-xs font-normal text-gray-400"> ر.س</span>
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <p className="text-sm font-extrabold text-[#1D9E75] shrink-0">
-                        {total.toFixed(2)} <span className="text-xs font-normal text-gray-400">ر.س</span>
-                      </p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
-              {/* حالة فارغة */}
+              {/* فارغ */}
               {selectedExpenses.length === 0 && (
                 <div className="rounded-3xl bg-white p-8 text-center shadow-lg">
                   <p className="text-4xl">📭</p>
@@ -276,7 +342,6 @@ export default function ReportsPage() {
                   </Link>
                 </div>
               )}
-
             </>
           )}
         </div>
