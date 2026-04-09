@@ -37,12 +37,15 @@ function toNumber(value: number | string | null): number {
 
 function formatDate(dateText: string | null): string {
   if (!dateText) return "-";
-  const date = new Date(dateText);
+  /* نضيف T12:00:00 لتجنب مشكلة اختلاف التوقيت عند تحويل التاريخ */
+  const date = new Date(`${dateText}T12:00:00+03:00`);
   if (Number.isNaN(date.getTime())) return dateText;
-  return date.toLocaleDateString("ar-SA", {
+  return date.toLocaleDateString("ar-EG-u-nu-latn", {
     year: "numeric",
     month: "long",
     day: "numeric",
+    timeZone: "Asia/Riyadh",
+    calendar: "gregory",
   });
 }
 
@@ -145,13 +148,14 @@ export default function ExpensesPage() {
     }
   }
 
-  const now = new Date();
+  /* تاريخ اليوم بتوقيت السعودية */
+  const nowSA = new Date(new Date().toLocaleString("en-CA", { timeZone: "Asia/Riyadh", hour12: false }));
   const currentMonthTotal = expenses.reduce((sum, expense) => {
     if (!expense.date) return sum;
-    const date = new Date(expense.date);
+    const date = new Date(`${expense.date}T12:00:00+03:00`);
     if (Number.isNaN(date.getTime())) return sum;
     const isCurrentMonth =
-      date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+      date.getFullYear() === nowSA.getFullYear() && date.getMonth() === nowSA.getMonth();
     return isCurrentMonth ? sum + toNumber(expense.amount) : sum;
   }, 0);
 

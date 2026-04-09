@@ -29,10 +29,16 @@ function toNumber(v: number | string | null): number {
   return 0;
 }
 
+/* تاريخ اليوم بتوقيت السعودية */
+function nowSA(): Date {
+  const s = new Date().toLocaleString("en-CA", { timeZone: "Asia/Riyadh", hour12: false });
+  return new Date(s);
+}
+
 /* آخر N شهر */
 function lastNMonths(n: number) {
   const result: { year: number; month: number; label: string }[] = [];
-  const now = new Date();
+  const now = nowSA();
   for (let i = n - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     result.push({ year: d.getFullYear(), month: d.getMonth(), label: MONTH_NAMES[d.getMonth()]! });
@@ -43,8 +49,8 @@ function lastNMonths(n: number) {
 export default function ReportsPage() {
   const [expenses, setExpenses]   = useState<Expense[]>([]);
   const [loading, setLoading]     = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
-  const [selectedYear, setSelectedYear]   = useState<number>(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number>(nowSA().getMonth());
+  const [selectedYear, setSelectedYear]   = useState<number>(nowSA().getFullYear());
 
   useEffect(() => { void fetchExpenses(); }, []);
 

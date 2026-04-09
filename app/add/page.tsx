@@ -63,6 +63,11 @@ declare global {
 
 const VOICE_DURATION = 15; /* ثواني */
 
+/* تاريخ اليوم بتوقيت السعودية +3 */
+function todaySA(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+}
+
 const ANALYZING_MESSAGES = [
   "🔍 فطين يقرأ فاتورتك...",
   "✨ يستخرج البيانات...",
@@ -98,7 +103,7 @@ export default function AddExpensePage() {
   const [error, setError]           = useState<string | null>(null);
   const [savedAmount, setSavedAmount] = useState<number | null>(null);
   const [expense, setExpense]       = useState<ExtractedExpense>({
-    store: "", amount: "", date: new Date().toISOString().split("T")[0]!, category: "أخرى",
+    store: "", amount: "", date: todaySA(), category: "أخرى",
     item_name: "", item_brand: "", items: null,
   });
 
@@ -191,7 +196,7 @@ export default function AddExpensePage() {
         setExpense({
           store:      String(raw["store"]      ?? ""),
           amount:     String(raw["amount"]     ?? ""),
-          date:       String(raw["date"]       ?? new Date().toISOString().split("T")[0]!),
+          date:       String(raw["date"]       ?? todaySA()),
           category:   (raw["category"] as Category) ?? "أخرى",
           item_name:  String(raw["item_name"]  ?? ""),
           item_brand: String(raw["item_brand"] ?? ""),
@@ -260,7 +265,7 @@ export default function AddExpensePage() {
     setError(null);
     setSavedAmount(null);
     stopRecording();
-    setExpense({ store: "", amount: "", date: new Date().toISOString().split("T")[0]!, category: "أخرى", item_name: "", item_brand: "", items: null });
+    setExpense({ store: "", amount: "", date: todaySA(), category: "أخرى", item_name: "", item_brand: "", items: null });
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
