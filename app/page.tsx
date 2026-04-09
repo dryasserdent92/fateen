@@ -42,6 +42,7 @@ export default function Home() {
   const [monthTotal, setMonthTotal]       = useState<number | null>(null);
   const [recentExpenses, setRecentExpenses] = useState<RecentExpense[]>([]);
   const [loading, setLoading]             = useState(true);
+  const [deletingId, setDeletingId]       = useState<number | string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -72,6 +73,26 @@ export default function Home() {
 
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  async function handleDeleteRecent(id: number | string) {
+    if (!confirm("هل تريد حذف هذا المصروف؟")) return;
+    setDeletingId(id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = session?.access_token
+        ? { "Authorization": `Bearer ${session.access_token}` } : {};
+      const res = await fetch(`/api/delete?id=${id}`, { method: "DELETE", headers });
+      if (res.ok) {
+        setRecentExpenses((prev) => prev.filter((e) => e.id !== id));
+        setExpenseCount((prev) => (prev !== null ? prev - 1 : null));
+        setMonthTotal((prev) => {
+          const deleted = recentExpenses.find((e) => e.id === id);
+          return prev !== null && deleted ? prev - toNumber(deleted.amount) : prev;
+        });
+      }
+    } catch { /* تجاهل */ }
+    finally { setDeletingId(null); }
+  }
 
   async function loadData(userId: string) {
     setLoading(true);
@@ -211,6 +232,14 @@ export default function Home() {
                     {toNumber(e.amount).toFixed(2)}
                     <span className="mr-0.5 text-xs font-normal text-gray-400">ر.س</span>
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => void handleDeleteRecent(e.id)}
+                    disabled={deletingId === e.id}
+                    className="flex-shrink-0 rounded-xl p-1.5 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-400 disabled:opacity-40"
+                  >
+                    {deletingId === e.id ? "⏳" : "🗑"}
+                  </button>
                 </div>
               ))}
             </div>
@@ -225,6 +254,13 @@ export default function Home() {
           )}
 
         </div>
+
+        {/* توقيع المطور */}
+        <p className="mt-8 pb-2 text-center text-xs text-white/40">
+          تصميم وتطوير{" "}
+          <span className="font-bold text-white/60">ياسر المنجم</span>
+        </p>
+
       </main>
       <BottomNav />
     </>
