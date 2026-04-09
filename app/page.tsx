@@ -92,9 +92,9 @@ export default function Home() {
       .limit(5);
     setRecentExpenses(recent ?? []);
 
-    /* إجمالي الشهر الحالي */
-    const nowSA = new Date(new Date().toLocaleString("en-CA", { timeZone: "Asia/Riyadh", hour12: false }));
-    const monthStart = `${nowSA.getFullYear()}-${String(nowSA.getMonth() + 1).padStart(2, "0")}-01`;
+    /* إجمالي الشهر الحالي — نص "YYYY-MM" بتوقيت السعودية */
+    const todaySAStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }); // "2026-04-09"
+    const monthStart = todaySAStr.slice(0, 7) + "-01"; // "2026-04-01"
     const { data: monthData } = await supabase
       .from("expenses")
       .select("amount")
@@ -107,8 +107,8 @@ export default function Home() {
   }
 
   const monthNames = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
-  const nowSA = new Date(new Date().toLocaleString("en-CA", { timeZone: "Asia/Riyadh", hour12: false }));
-  const currentMonthName = monthNames[nowSA.getMonth()];
+  const nowSAStr2 = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }); // "2026-04-09"
+  const currentMonthName = monthNames[parseInt(nowSAStr2.slice(5, 7)) - 1];
 
   /* غير مسجل دخول */
   if (!isLoggedIn && !loading) {

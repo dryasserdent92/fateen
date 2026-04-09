@@ -178,15 +178,14 @@ export default function ExpensesPage() {
     }
   }
 
-  /* تاريخ اليوم بتوقيت السعودية */
-  const nowSA = new Date(new Date().toLocaleString("en-CA", { timeZone: "Asia/Riyadh", hour12: false }));
+  /* تاريخ اليوم بتوقيت السعودية — نص نظيف "YYYY-MM-DD" */
+  const todaySAStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+  const currentYearMonth = todaySAStr.slice(0, 7); /* "2026-04" */
   const currentMonthTotal = expenses.reduce((sum, expense) => {
     if (!expense.date) return sum;
-    const date = new Date(`${expense.date}T12:00:00+03:00`);
-    if (Number.isNaN(date.getTime())) return sum;
-    const isCurrentMonth =
-      date.getFullYear() === nowSA.getFullYear() && date.getMonth() === nowSA.getMonth();
-    return isCurrentMonth ? sum + toNumber(expense.amount) : sum;
+    return expense.date.slice(0, 7) === currentYearMonth
+      ? sum + toNumber(expense.amount)
+      : sum;
   }, 0);
 
   /* ملخص التصنيفات */
@@ -204,19 +203,18 @@ export default function ExpensesPage() {
   /* ── تقسيم المصاريف لمجموعات زمنية ── */
   function getWeekGroup(dateStr: string | null): "هذا الأسبوع" | "الأسبوع الماضي" | "أقدم" {
     if (!dateStr) return "أقدم";
-    const d    = new Date(`${dateStr}T12:00:00+03:00`);
-    const now  = new Date(new Date().toLocaleString("en-CA", { timeZone: "Asia/Riyadh", hour12: false }));
-    const day  = now.getDay(); // 0=أحد
-    // بداية هذا الأسبوع (الأحد)
-    const startOfThisWeek = new Date(now);
-    startOfThisWeek.setDate(now.getDate() - day);
-    startOfThisWeek.setHours(0, 0, 0, 0);
-    // بداية الأسبوع الماضي
-    const startOfLastWeek = new Date(startOfThisWeek);
-    startOfLastWeek.setDate(startOfThisWeek.getDate() - 7);
+    /* فرق الأيام بمقارنة الطوابع الزمنية بتوقيت السعودية */
+    const todayMs   = new Date(`${todaySAStr}T12:00:00+03:00`).getTime();
+    const expenseMs = new Date(`${dateStr}T12:00:00+03:00`).getTime();
+    const daysAgo   = Math.round((todayMs - expenseMs) / 86_400_000);
 
-    if (d >= startOfThisWeek)  return "هذا الأسبوع";
-    if (d >= startOfLastWeek)  return "الأسبوع الماضي";
+    /* يوم الأسبوع الحالي بتوقيت السعودية (0=أحد … 6=سبت) */
+    const dowLabel = new Date(`${todaySAStr}T12:00:00+03:00`)
+      .toLocaleDateString("en-US", { weekday: "short", timeZone: "Asia/Riyadh" });
+    const dow = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(dowLabel); // 0-6
+
+    if (daysAgo <= dow)        return "هذا الأسبوع";   /* من الأحد حتى اليوم */
+    if (daysAgo <= dow + 7)    return "الأسبوع الماضي";
     return "أقدم";
   }
 
