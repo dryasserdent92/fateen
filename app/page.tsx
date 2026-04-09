@@ -96,12 +96,20 @@ export default function Home() {
 
           {/* زر المصاريف — يظهر فقط إذا عنده مصاريف أو لم نعرف بعد */}
           {(expenseCount === null || expenseCount > 0) && (
-            <Link
-              href="/expenses"
-              className="w-full rounded-2xl border-2 border-white bg-transparent px-6 py-4 text-lg font-semibold text-white transition-opacity hover:opacity-90"
-            >
-              مصاريفي {expenseCount !== null && expenseCount > 0 ? `(${expenseCount})` : ""}
-            </Link>
+            <div className="flex gap-3">
+              <Link
+                href="/expenses"
+                className="flex-1 rounded-2xl border-2 border-white bg-transparent px-6 py-4 text-center text-lg font-semibold text-white transition-opacity hover:opacity-90"
+              >
+                مصاريفي {expenseCount !== null && expenseCount > 0 ? `(${expenseCount})` : ""}
+              </Link>
+              <Link
+                href="/reports"
+                className="rounded-2xl border-2 border-white bg-transparent px-5 py-4 text-lg font-semibold text-white transition-opacity hover:opacity-90"
+              >
+                📊
+              </Link>
+            </div>
           )}
 
           {isLoggedIn ? (

@@ -176,12 +176,20 @@ export default function ExpensesPage() {
           <header className="rounded-3xl bg-white p-6 shadow-lg">
             <div className="flex items-center justify-between gap-4">
               <h1 className="text-3xl font-extrabold text-[#1D9E75]">مصاريفي</h1>
-              <Link
-                href="/"
-                className="rounded-xl bg-[#1D9E75]/10 px-4 py-2 text-sm font-semibold text-[#1D9E75] transition-opacity hover:opacity-70"
-              >
-                ← الرئيسية
-              </Link>
+              <div className="flex gap-2">
+                <Link
+                  href="/reports"
+                  className="rounded-xl bg-[#1D9E75]/10 px-3 py-2 text-sm font-semibold text-[#1D9E75] transition-opacity hover:opacity-70"
+                >
+                  📊 تقارير
+                </Link>
+                <Link
+                  href="/"
+                  className="rounded-xl bg-[#1D9E75]/10 px-3 py-2 text-sm font-semibold text-[#1D9E75] transition-opacity hover:opacity-70"
+                >
+                  ← الرئيسية
+                </Link>
+              </div>
             </div>
 
             <div className="mt-5 rounded-2xl bg-[#1D9E75]/5 p-4">
