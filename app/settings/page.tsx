@@ -12,8 +12,6 @@ export default function SettingsPage() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [cleaning, setCleaning]     = useState(false);
-  const [cleanMsg, setCleanMsg]     = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -32,29 +30,6 @@ export default function SettingsPage() {
     setLoggingOut(true);
     await supabase.auth.signOut();
     router.push("/login");
-  }
-
-  async function handleCleanZeroAmounts() {
-    if (!confirm("سيتم حذف جميع المصاريف المحفوظة بمبلغ صفر. هل تريد المتابعة؟")) return;
-    setCleaning(true);
-    setCleanMsg(null);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch("/api/fix-amounts", {
-        method: "DELETE",
-        headers: session?.access_token ? { "Authorization": `Bearer ${session.access_token}` } : {},
-      });
-      const json = (await res.json()) as { deleted?: number; error?: string };
-      if (res.ok) {
-        setCleanMsg(json.deleted === 0 ? "✅ لا توجد مصاريف بمبلغ صفر" : `✅ تم حذف ${json.deleted} مصروف بمبلغ صفر`);
-      } else {
-        setCleanMsg(`❌ ${json.error ?? "حدث خطأ"}`);
-      }
-    } catch {
-      setCleanMsg("❌ تعذر الاتصال بالسيرفر");
-    } finally {
-      setCleaning(false);
-    }
   }
 
   return (
@@ -107,25 +82,6 @@ export default function SettingsPage() {
               <span className="text-sm font-semibold text-gray-700">👨‍💻 تصميم وتطوير</span>
               <span className="text-sm font-bold text-[#1D9E75]">ياسر المنجم</span>
             </div>
-          </div>
-
-          {/* تنظيف المصاريف الصفرية */}
-          <div className="rounded-3xl bg-white p-5 shadow-lg space-y-3">
-            <p className="text-xs font-bold text-gray-400">صيانة البيانات</p>
-            <p className="text-xs text-gray-500">
-              إذا كانت بعض مصاريفك تظهر بمبلغ صفر، اضغط هنا لحذفها تلقائياً.
-            </p>
-            {cleanMsg && (
-              <p className="rounded-xl bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700">{cleanMsg}</p>
-            )}
-            <button
-              type="button"
-              onClick={() => void handleCleanZeroAmounts()}
-              disabled={cleaning}
-              className="w-full rounded-2xl border border-orange-200 bg-orange-50 py-3 text-sm font-bold text-orange-600 transition-opacity hover:opacity-80 disabled:opacity-50"
-            >
-              {cleaning ? "⏳ جاري التنظيف..." : "🧹 حذف المصاريف بمبلغ صفر"}
-            </button>
           </div>
 
           {/* Logout */}
