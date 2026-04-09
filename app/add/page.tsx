@@ -221,8 +221,9 @@ export default function AddExpensePage() {
 
   /* ── Save ── */
   async function handleSave() {
-    if (!expense.amount || isNaN(parseFloat(expense.amount))) {
-      setError("أدخل مبلغاً صحيحاً"); return;
+    const parsedAmount = parseFloat(expense.amount);
+    if (!expense.amount || isNaN(parsedAmount) || parsedAmount <= 0) {
+      setError("أدخل مبلغاً صحيحاً — المبلغ لا يمكن أن يكون صفراً"); return;
     }
     setError(null);
     setSaving(true);
@@ -489,10 +490,14 @@ export default function AddExpensePage() {
                     onChange={(e) => setExpense((p) => ({ ...p, amount: e.target.value }))}
                     placeholder="0.00"
                     className={`w-full rounded-xl border p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2 ${
-                      !expense.amount || expense.amount === "0" ? "border-amber-300 bg-amber-50" : "border-[#1D9E75]/30"
+                      !expense.amount || parseFloat(expense.amount) <= 0 ? "border-red-300 bg-red-50" : "border-[#1D9E75]/30"
                     }`}
                   />
-                  {(!expense.amount || expense.amount === "0") && <p className="text-xs text-amber-500 mt-1">⚠️ أدخل المبلغ يدوياً</p>}
+                  {(!expense.amount || parseFloat(expense.amount) <= 0) && (
+                    <p className="text-xs font-semibold text-red-500 mt-1">
+                      ⚠️ المبلغ غير محدد — أدخله يدوياً قبل الحفظ
+                    </p>
+                  )}
                 </div>
 
                 <div>

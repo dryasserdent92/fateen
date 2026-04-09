@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   try {
     rows = payloadExpenses.map((expense) => {
       const { store, amount, date, category, item_name, item_brand, items } = expense;
-      if (typeof amount !== "number" || isNaN(amount) || amount < 0) {
+      if (typeof amount !== "number" || isNaN(amount) || amount <= 0) {
         throw new Error("INVALID_AMOUNT");
       }
       return {
