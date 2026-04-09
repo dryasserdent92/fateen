@@ -40,16 +40,18 @@ function formatDate(dateText: string | null): string {
   });
 }
 
-function nowSA(): Date {
-  const s = new Date().toLocaleString("en-CA", { timeZone: "Asia/Riyadh", hour12: false });
-  return new Date(s);
+/* تاريخ اليوم بتوقيت السعودية — نص نظيف "YYYY-MM-DD" بدون فاصلة */
+function getNowSA(): { year: number; month: number } {
+  const s = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }); // "2026-04-09"
+  const [y, m] = s.split("-").map(Number);
+  return { year: y!, month: m! - 1 }; /* month بصيغة 0-indexed */
 }
 
 function lastNMonths(n: number) {
   const result: { year: number; month: number; label: string }[] = [];
-  const now = nowSA();
+  const { year, month } = getNowSA();
   for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const d = new Date(year, month - i, 1);
     result.push({ year: d.getFullYear(), month: d.getMonth(), label: MONTH_NAMES[d.getMonth()]! });
   }
   return result;
@@ -58,8 +60,9 @@ function lastNMonths(n: number) {
 export default function ReportsPage() {
   const [expenses, setExpenses]           = useState<Expense[]>([]);
   const [loading, setLoading]             = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState<number>(nowSA().getMonth());
-  const [selectedYear, setSelectedYear]   = useState<number>(nowSA().getFullYear());
+  const { year: initYear, month: initMonth } = getNowSA();
+  const [selectedMonth, setSelectedMonth] = useState<number>(initMonth);
+  const [selectedYear, setSelectedYear]   = useState<number>(initYear);
 
   /* التوسيع في المكان */
   const [expandedCat, setExpandedCat]     = useState<string | null>(null);
