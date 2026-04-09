@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../../lib/supabase";
 import AuthGuard from "../components/auth-guard";
+import BottomNav from "../components/bottom-nav";
 
 type ExpenseItem = {
   name: string;
@@ -236,27 +237,13 @@ export default function ExpensesPage() {
 
   return (
     <AuthGuard>
-      <main className="min-h-screen bg-[#1D9E75] px-6 py-10 font-sans">
+      <main className="min-h-screen bg-[#1D9E75] px-6 py-10 pb-28 font-sans">
         <div className="mx-auto w-full max-w-xl space-y-5">
 
           {/* Header card */}
           <header className="rounded-3xl bg-white p-6 shadow-lg">
             <div className="flex items-center justify-between gap-4">
               <h1 className="text-3xl font-extrabold text-[#1D9E75]">مصاريفي</h1>
-              <div className="flex gap-2">
-                <Link
-                  href="/reports"
-                  className="rounded-xl bg-[#1D9E75]/10 px-3 py-2 text-sm font-semibold text-[#1D9E75] transition-opacity hover:opacity-70"
-                >
-                  📊 تقارير
-                </Link>
-                <Link
-                  href="/"
-                  className="rounded-xl bg-[#1D9E75]/10 px-3 py-2 text-sm font-semibold text-[#1D9E75] transition-opacity hover:opacity-70"
-                >
-                  ← الرئيسية
-                </Link>
-              </div>
             </div>
 
             <div className="mt-5 rounded-2xl bg-[#1D9E75]/5 p-4">
@@ -566,6 +553,7 @@ export default function ExpensesPage() {
           </section>
         </div>
       </main>
+      <BottomNav />
     </AuthGuard>
   );
 }

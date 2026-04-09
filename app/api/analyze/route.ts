@@ -38,11 +38,20 @@ function parseClaudeText(text: string): ParsedExpense {
   return JSON.parse(clean) as ParsedExpense;
 }
 
+/* تحويل الأرقام العربية الهندية (٠-٩) إلى أرقام غربية (0-9) */
+function toWesternDigits(str: string): string {
+  return str.replace(/[٠١٢٣٤٥٦٧٨٩]/g, (d) =>
+    String("٠١٢٣٤٥٦٧٨٩".indexOf(d))
+  );
+}
+
 function normalizeExpense(parsed: ParsedExpense) {
   const today = new Date().toISOString().split("T")[0];
   const normalizedDate =
     typeof parsed.date === "string" && parsed.date.trim() ? parsed.date : today;
-  const amount = parseFloat(parsed.amount?.toString().replace(/[^\d.]/g, "") || "0");
+  const rawAmount = toWesternDigits(parsed.amount?.toString() ?? "")
+    .replace(/[^\d.]/g, "");
+  const amount = parseFloat(rawAmount || "0");
 
   return {
     store:      parsed.store ?? null,

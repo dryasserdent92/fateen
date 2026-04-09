@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../../lib/supabase";
 import AuthGuard from "../components/auth-guard";
+import BottomNav from "../components/bottom-nav";
 
 type Expense = {
   id: number | string;
@@ -152,15 +153,12 @@ export default function ReportsPage() {
 
   return (
     <AuthGuard>
-      <main className="min-h-screen bg-[#1D9E75] px-4 py-8 font-sans">
+      <main className="min-h-screen bg-[#1D9E75] px-4 py-8 pb-28 font-sans">
         <div className="mx-auto w-full max-w-xl space-y-4">
 
           {/* Header */}
-          <header className="flex items-center justify-between">
+          <header>
             <h1 className="text-3xl font-extrabold text-white">📊 التقارير</h1>
-            <Link href="/" className="rounded-xl bg-white/20 px-4 py-2 text-sm font-semibold text-white">
-              ← الرئيسية
-            </Link>
           </header>
 
           {loading ? (
@@ -346,6 +344,7 @@ export default function ReportsPage() {
           )}
         </div>
       </main>
+      <BottomNav />
     </AuthGuard>
   );
 }
