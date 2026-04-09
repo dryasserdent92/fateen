@@ -134,14 +134,22 @@ export default function ExpensesPage() {
     }
   }
 
+  async function getAuthHeader(): Promise<Record<string, string>> {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token
+      ? { "Authorization": `Bearer ${session.access_token}` }
+      : {};
+  }
+
   async function handleDeleteSelected() {
     if (selected.size === 0) return;
     if (!confirm(`هل تريد حذف ${selected.size} مصروف؟`)) return;
     setDeleting(true);
     try {
+      const headers = await getAuthHeader();
       await Promise.all(
         Array.from(selected).map((id) =>
-          fetch(`/api/delete?id=${id}`, { method: "DELETE" }),
+          fetch(`/api/delete?id=${id}`, { method: "DELETE", headers }),
         ),
       );
       setExpenses((prev) => prev.filter((e) => !selected.has(e.id)));
@@ -157,7 +165,8 @@ export default function ExpensesPage() {
   async function handleDeleteSingle(id: number | string) {
     if (!confirm("هل تريد حذف هذا المصروف؟")) return;
     try {
-      const res = await fetch(`/api/delete?id=${id}`, { method: "DELETE" });
+      const headers = await getAuthHeader();
+      const res = await fetch(`/api/delete?id=${id}`, { method: "DELETE", headers });
       if (res.ok) {
         setExpenses((prev) => prev.filter((e) => e.id !== id));
       } else {

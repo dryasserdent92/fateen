@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getUserIdFromRequest } from "../../../lib/auth";
 
 type ExpenseItem = {
   name: string;
@@ -97,6 +98,12 @@ async function callClaude(
 }
 
 export async function POST(req: NextRequest) {
+  /* ── التحقق من الهوية ── */
+  const userId = await getUserIdFromRequest(req);
+  if (!userId) {
+    return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "No ANTHROPIC_API_KEY" }, { status: 500 });

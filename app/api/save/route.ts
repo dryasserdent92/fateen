@@ -1,17 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getUserIdFromRequest } from "../../../lib/auth";
 
 export async function POST(req: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_KEY;
+  /* ── التحقق من الهوية ── */
+  const userId = await getUserIdFromRequest(req);
+  if (!userId) {
+    return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
+  }
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey  = process.env.SUPABASE_SERVICE_KEY;
   if (!supabaseUrl || !serviceKey) {
     return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
   }
 
-  /* استخراج بيانات المصروف من الطلب */
   const body = (await req.json()) as {
-    user_id?: string | null;
     store?: string | null;
     amount?: number;
     date?: string;
@@ -30,9 +34,6 @@ export async function POST(req: NextRequest) {
     }>;
   };
 
-  const userId =
-    typeof body.user_id === "string" && body.user_id.trim() ? body.user_id.trim() : null;
-
   const payloadExpenses =
     Array.isArray(body.expenses) && body.expenses.length > 0
       ? body.expenses
@@ -48,14 +49,14 @@ export async function POST(req: NextRequest) {
         throw new Error("INVALID_AMOUNT");
       }
       return {
-        store: store ?? null,
+        store:      store      ?? null,
         amount,
-        date: date ?? new Date().toISOString().split("T")[0],
-        category: category ?? "أخرى",
-        item_name: item_name ?? null,
+        date:       date       ?? new Date().toISOString().split("T")[0],
+        category:   category   ?? "أخرى",
+        item_name:  item_name  ?? null,
         item_brand: item_brand ?? null,
-        items: items ?? null,
-        user_id: userId,
+        items:      items      ?? null,
+        user_id:    userId,   /* دائماً من JWT، لا من الطلب */
       };
     });
   } catch {
@@ -63,7 +64,6 @@ export async function POST(req: NextRequest) {
   }
 
   const { error: insertError } = await supabase.from("expenses").insert(rows);
-
   if (insertError) {
     console.error("Supabase insert error:", insertError);
     return NextResponse.json({ error: "فشل الحفظ في قاعدة البيانات" }, { status: 502 });

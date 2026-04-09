@@ -177,12 +177,17 @@ export default function AddExpensePage() {
       setAnalyzeMsg((prev) => (prev + 1) % ANALYZING_MESSAGES.length);
     }, 1800);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const formData = new FormData();
       if (method === "image" && file)          formData.append("image", file);
       if (method === "sms")                    formData.append("smsText", smsText.trim());
       if (method === "voice")                  formData.append("smsText", transcript.trim());
 
-      const res  = await fetch("/api/analyze", { method: "POST", body: formData });
+      const res  = await fetch("/api/analyze", {
+        method: "POST",
+        headers: session?.access_token ? { "Authorization": `Bearer ${session.access_token}` } : {},
+        body: formData,
+      });
       const data = (await res.json()) as {
         expense?: Record<string, unknown>;
         mergedExpense?: Record<string, unknown>;
@@ -223,19 +228,21 @@ export default function AddExpensePage() {
     setSaving(true);
     try {
       const {
-        data: { user },
+        data: { session },
         error: authError,
-      } = await supabase.auth.getUser();
-      if (authError || !user?.id) {
+      } = await supabase.auth.getSession();
+      if (authError || !session?.access_token) {
         setError("تعذر التحقق من هويتك، سجّل الدخول مجدداً.");
         return;
       }
 
       const res = await fetch("/api/save", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type":  "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({
-          user_id:    user.id,
           store:      expense.store || null,
           amount:     parseFloat(expense.amount),
           date:       expense.date,
