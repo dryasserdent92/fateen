@@ -145,12 +145,33 @@ export async function GET(req: NextRequest) {
     .slice(0, 5)
     .map((u) => ({ name: u.name, avatar: u.avatar, total: Math.round(u.expenseTotal), count: u.expenseCount }));
 
+  /* ── مصاريف مشبوهة (أكثر من 10,000 ر.س في مصروف واحد) ── */
+  const SUSPICION_THRESHOLD = 10_000;
+  const suspiciousExpenses = (expenseRows ?? [])
+    .filter((r) => {
+      const amt = typeof r.amount === "number" ? r.amount : parseFloat(r.amount ?? "0") || 0;
+      return amt > SUSPICION_THRESHOLD;
+    })
+    .map((r) => {
+      const uid  = r.user_id as string;
+      const user = userList.find((u) => u.id === uid);
+      return {
+        userId:   uid,
+        userName: user?.name ?? "مجهول",
+        amount:   typeof r.amount === "number" ? r.amount : parseFloat(r.amount ?? "0"),
+        date:     r.date as string | null,
+        category: (r.category as string) ?? "أخرى",
+      };
+    })
+    .sort((a, b) => b.amount - a.amount);
+
   return NextResponse.json({
     summary: { totalUsers, newThisMonth, newLastMonth, activeThisMonth, totalExpenses, totalAmount },
     monthlyGrowth,
     topCategories,
     engagementBuckets,
     topSpenders,
+    suspiciousExpenses,
     users: userList,
   });
 }

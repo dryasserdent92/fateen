@@ -48,6 +48,10 @@ export async function POST(req: NextRequest) {
       if (typeof amount !== "number" || isNaN(amount) || amount <= 0) {
         throw new Error("INVALID_AMOUNT");
       }
+      // سقف أمان: لا يُقبل مصروف بأكثر من 99,999 ر.س (يمنع الأرقام الفاسدة مثل 1,000,000)
+      if (amount > 99_999) {
+        throw new Error("AMOUNT_TOO_LARGE");
+      }
       return {
         store:      store      ?? null,
         amount,

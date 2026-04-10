@@ -20,9 +20,10 @@ type UserRow = {
   isActive: boolean;
 };
 
-type MonthItem  = { ym: string; label: string; count: number };
-type CatItem    = { cat: string; count: number; amount: number };
-type SpenderRow = { name: string; avatar: string | null; total: number; count: number };
+type MonthItem      = { ym: string; label: string; count: number };
+type CatItem        = { cat: string; count: number; amount: number };
+type SpenderRow     = { name: string; avatar: string | null; total: number; count: number };
+type SuspiciousRow  = { userId: string; userName: string; amount: number; date: string | null; category: string };
 
 type Stats = {
   summary: {
@@ -33,11 +34,12 @@ type Stats = {
     totalExpenses: number;
     totalAmount: number;
   };
-  monthlyGrowth:     MonthItem[];
-  topCategories:     CatItem[];
-  engagementBuckets: Record<string, number>;
-  topSpenders:       SpenderRow[];
-  users:             UserRow[];
+  monthlyGrowth:       MonthItem[];
+  topCategories:       CatItem[];
+  engagementBuckets:   Record<string, number>;
+  topSpenders:         SpenderRow[];
+  suspiciousExpenses:  SuspiciousRow[];
+  users:               UserRow[];
 };
 
 /* ─── Helpers ─── */
@@ -377,6 +379,34 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
+
+        {/* ⚠️ مصاريف مشبوهة */}
+        {stats!.suspiciousExpenses.length > 0 && (
+          <div className="rounded-3xl bg-orange-50 border border-orange-200 p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-lg">⚠️</span>
+              <h2 className="text-sm font-bold text-orange-700">
+                مصاريف مشبوهة — مبالغ تتجاوز 10,000 ر.س ({stats!.suspiciousExpenses.length})
+              </h2>
+            </div>
+            <div className="space-y-2">
+              {stats!.suspiciousExpenses.map((s, i) => (
+                <div key={i} className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 shadow-sm">
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">{s.userName}</p>
+                    <p className="text-xs text-gray-400">{s.category} · {s.date ?? "—"}</p>
+                  </div>
+                  <span className="text-base font-extrabold text-orange-500">
+                    {s.amount.toLocaleString("ar-SA-u-nu-latn")} ر.س
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-orange-500">
+              💡 هذه المصاريف قد تكون بيانات فاسدة — احذفها من Supabase إذا كانت خاطئة. المصاريف الجديدة محدودة بـ 99,999 ر.س.
+            </p>
+          </div>
+        )}
 
         {/* فلتر وبحث */}
         <div className="flex flex-wrap items-center gap-3">
