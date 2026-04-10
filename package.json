@@ -7,11 +7,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "build:ios": "BUILD_TARGET=capacitor NEXT_PUBLIC_API_URL=https://YOUR-VERCEL-URL.vercel.app next build && npx cap sync ios",
+    "build:ios": "npx cap sync ios",
     "open:ios": "npx cap open ios",
     "cap:sync": "npx cap sync"
   },
   "dependencies": {
+    "@capacitor/cli": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
+    "@capacitor/ios": "^8.3.0",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2",
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.102.1",
     "next": "16.2.2",

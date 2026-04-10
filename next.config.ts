@@ -12,18 +12,8 @@ const securityHeaders = [
   },
 ];
 
-// عند البناء لـ Capacitor (iOS/Android)، نُصدر تطبيقاً ثابتاً
-const isCapacitorBuild = process.env.BUILD_TARGET === "capacitor";
-
 const nextConfig: NextConfig = {
-  ...(isCapacitorBuild && {
-    output: "export",      // يُنتج مجلد out/ ثابت
-    trailingSlash: true,   // ضروري لعمل الروابط في Capacitor
-    images: { unoptimized: true }, // الصور لا تحتاج خادم
-  }),
   async headers() {
-    // الـ headers لا تعمل في الـ static export
-    if (isCapacitorBuild) return [];
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
 };

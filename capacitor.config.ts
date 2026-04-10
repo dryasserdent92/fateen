@@ -1,13 +1,13 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "com.fateen.app",           // Bundle ID — غيّره لما تسجّل في App Store Connect
+  appId: "com.fateen.app",
   appName: "فطين",
-  webDir: "out",                     // مجلد الـ static export
+  webDir: "out",
   server: {
-    // أزل التعليق عن السطر التالي فقط أثناء التطوير لتسريع التحميل
-    // url: "https://YOUR-VERCEL-URL.vercel.app",
-    // androidScheme: "https",
+    // يحمّل التطبيق من Vercel مباشرةً — يحل مشكلة API routes في static export
+    url: "https://fateenapp.vercel.app",
+    cleartext: false,
   },
   plugins: {
     StatusBar: {
