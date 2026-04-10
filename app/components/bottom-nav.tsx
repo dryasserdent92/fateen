@@ -16,7 +16,8 @@ export default function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.07)]">
-      <div className="mx-auto flex max-w-xl items-end justify-around px-2 pb-safe pt-1">
+      {/* pb يأخذ زر الرئيسية في iPhone X+ بعين الاعتبار */}
+      <div className="mx-auto flex max-w-xl items-end justify-around px-2 pt-1 bottom-nav-ios" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 4px)" }}>
         {NAV_ITEMS.map((item) => {
           /* زر الإضافة المركزي */
           if (item.icon === null) {

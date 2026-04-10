@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../../lib/supabase";
+import { apiUrl } from "../../lib/api-client";
 import AuthGuard from "../components/auth-guard";
 import BottomNav from "../components/bottom-nav";
 
@@ -150,7 +151,7 @@ export default function ExpensesPage() {
       const headers = await getAuthHeader();
       await Promise.all(
         Array.from(selected).map((id) =>
-          fetch(`/api/delete?id=${id}`, { method: "DELETE", headers }),
+          fetch(apiUrl(`/api/delete?id=${id}`), { method: "DELETE", headers }),
         ),
       );
       setExpenses((prev) => prev.filter((e) => !selected.has(e.id)));
@@ -167,7 +168,7 @@ export default function ExpensesPage() {
     if (!confirm("هل تريد حذف هذا المصروف؟")) return;
     try {
       const headers = await getAuthHeader();
-      const res = await fetch(`/api/delete?id=${id}`, { method: "DELETE", headers });
+      const res = await fetch(apiUrl(`/api/delete?id=${id}`), { method: "DELETE", headers });
       if (res.ok) {
         setExpenses((prev) => prev.filter((e) => e.id !== id));
       } else {

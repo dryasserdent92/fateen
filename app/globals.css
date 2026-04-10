@@ -24,3 +24,21 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
+
+/* ─── iOS Safe Areas (Capacitor) ─── */
+/* يمنع المحتوى من الاختباء خلف الـ notch وشريط الحالة وزر الرئيسية */
+:root {
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left, 0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
+}
+
+/* padding أعلى الصفحات يأخذ الـ notch بعين الاعتبار */
+.ios-safe-top    { padding-top: var(--safe-top); }
+.ios-safe-bottom { padding-bottom: var(--safe-bottom); }
+
+/* الشريط السفلي يتجاوز زر الرئيسية */
+.bottom-nav-ios {
+  padding-bottom: calc(var(--safe-bottom) + 0.5rem);
+}

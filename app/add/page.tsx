@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import AuthGuard from "../components/auth-guard";
 import { supabase } from "../../lib/supabase";
+import { apiUrl } from "../../lib/api-client";
 
 const CATEGORIES = ["مطاعم", "قهوة", "بنزين", "سوبرماركت", "تسوق", "صحة", "فواتير", "أخرى"] as const;
 type Category = (typeof CATEGORIES)[number];
@@ -183,7 +184,7 @@ export default function AddExpensePage() {
       if (method === "sms")                    formData.append("smsText", smsText.trim());
       if (method === "voice")                  formData.append("smsText", transcript.trim());
 
-      const res  = await fetch("/api/analyze", {
+      const res  = await fetch(apiUrl("/api/analyze"), {
         method: "POST",
         headers: session?.access_token ? { "Authorization": `Bearer ${session.access_token}` } : {},
         body: formData,
@@ -237,7 +238,7 @@ export default function AddExpensePage() {
         return;
       }
 
-      const res = await fetch("/api/save", {
+      const res = await fetch(apiUrl("/api/save"), {
         method: "POST",
         headers: {
           "Content-Type":  "application/json",

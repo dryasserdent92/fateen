@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../lib/supabase";
+import { apiUrl } from "../lib/api-client";
 import BottomNav from "./components/bottom-nav";
 
 type RecentExpense = {
@@ -81,7 +82,7 @@ export default function Home() {
       const { data: { session } } = await supabase.auth.getSession();
       const headers: Record<string, string> = session?.access_token
         ? { "Authorization": `Bearer ${session.access_token}` } : {};
-      const res = await fetch(`/api/delete?id=${id}`, { method: "DELETE", headers });
+      const res = await fetch(apiUrl(`/api/delete?id=${id}`), { method: "DELETE", headers });
       if (res.ok) {
         setRecentExpenses((prev) => prev.filter((e) => e.id !== id));
         setExpenseCount((prev) => (prev !== null ? prev - 1 : null));

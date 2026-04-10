@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
+import { apiUrl } from "../../lib/api-client";
 
 /* ─── Types ─── */
 type UserRow = {
@@ -85,7 +86,7 @@ export default function AdminDashboard() {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { router.push("/login"); return; }
-    const res = await fetch("/api/admin/stats", {
+    const res = await fetch(apiUrl("/api/admin/stats"), {
       headers: {
         "Authorization":    `Bearer ${session.access_token}`,
         "x-admin-password": password,
@@ -107,7 +108,7 @@ export default function AdminDashboard() {
     setDeletingUser(userId);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`/api/admin/delete-user?userId=${userId}`, {
+      const res = await fetch(apiUrl(`/api/admin/delete-user?userId=${userId}`), {
         method: "DELETE",
         headers: {
           "Authorization":    `Bearer ${session!.access_token}`,
@@ -132,7 +133,7 @@ export default function AdminDashboard() {
     setError(null);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { router.push("/login"); return; }
-    const res = await fetch("/api/admin/stats", {
+    const res = await fetch(apiUrl("/api/admin/stats"), {
       headers: {
         "Authorization":    `Bearer ${session.access_token}`,
         "x-admin-password": password,

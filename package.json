@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "build:ios": "BUILD_TARGET=capacitor NEXT_PUBLIC_API_URL=https://YOUR-VERCEL-URL.vercel.app next build && npx cap sync ios",
+    "open:ios": "npx cap open ios",
+    "cap:sync": "npx cap sync"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.0",
