@@ -103,6 +103,7 @@ export default function AddExpensePage() {
   const [saving, setSaving]         = useState(false);
   const [error, setError]           = useState<string | null>(null);
   const [savedAmount, setSavedAmount] = useState<number | null>(null);
+  const [confirmed, setConfirmed]   = useState(false); /* تأكيد الأصناف قبل الحفظ */
   const [expense, setExpense]       = useState<ExtractedExpense>({
     store: "", amount: "", date: todaySA(), category: "أخرى",
     item_name: "", item_brand: "", items: null,
@@ -273,6 +274,7 @@ export default function AddExpensePage() {
     setTranscript("");
     setError(null);
     setSavedAmount(null);
+    setConfirmed(false);
     stopRecording();
     setExpense({ store: "", amount: "", date: todaySA(), category: "أخرى", item_name: "", item_brand: "", items: null });
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -627,9 +629,31 @@ export default function AddExpensePage() {
                     </div>
                   </div>
                 ) : (
-                  /* ── السلعة والماركة (للمشتريات الأحادية) ── */
+                  /* ── الصنف الواحد ── */
                   <div className="rounded-2xl border border-[#1D9E75]/20 bg-[#1D9E75]/5 p-4 space-y-3">
-                    <p className="text-xs font-bold text-[#1D9E75]/70 uppercase tracking-wide">تفاصيل السلعة (اختياري)</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold text-[#1D9E75]/70 uppercase tracking-wide">تفاصيل السلعة (اختياري)</p>
+                      {/* زر التحويل لأصناف متعددة */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const amt = parseFloat(expense.amount) || 0;
+                          setExpense((p) => ({
+                            ...p,
+                            items: [{
+                              name: p.item_name || "",
+                              brand: p.item_brand || null,
+                              quantity: 1,
+                              unit_price: amt,
+                              total_price: amt,
+                            }],
+                          }));
+                        }}
+                        className="text-xs font-bold text-[#1D9E75] bg-white border border-[#1D9E75]/30 rounded-xl px-3 py-1 hover:bg-[#1D9E75]/10"
+                      >
+                        🛒 تحويل لأصناف متعددة
+                      </button>
+                    </div>
 
                     <div>
                       <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">اسم السلعة</label>
@@ -656,13 +680,37 @@ export default function AddExpensePage() {
                 <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">{error}</p>
               )}
 
-              <div className="flex gap-3 pt-1">
+              {/* ── تأكيد الأصناف قبل الحفظ ── */}
+              <button
+                type="button"
+                onClick={() => setConfirmed((v) => !v)}
+                className={`w-full flex items-center gap-3 rounded-2xl border-2 px-4 py-3 transition-all ${
+                  confirmed
+                    ? "border-[#1D9E75] bg-[#1D9E75]/8"
+                    : "border-gray-200 bg-gray-50 hover:border-[#1D9E75]/40"
+                }`}
+              >
+                <span className={`flex size-6 shrink-0 items-center justify-center rounded-lg border-2 text-sm font-bold transition-all ${
+                  confirmed ? "border-[#1D9E75] bg-[#1D9E75] text-white" : "border-gray-300 text-transparent"
+                }`}>
+                  ✓
+                </span>
+                <span className={`text-sm font-semibold ${confirmed ? "text-[#1D9E75]" : "text-gray-500"}`}>
+                  {expense.items && expense.items.length > 0
+                    ? `راجعت وأتأكد من الأصناف الـ ${expense.items.length} وجاهز للحفظ`
+                    : "راجعت البيانات وهي صحيحة"}
+                </span>
+              </button>
+
+              <div className="flex gap-3">
                 <button type="button" onClick={reset}
                   className="flex-1 rounded-2xl border-2 border-[#1D9E75] py-3 text-sm font-bold text-[#1D9E75] transition-opacity hover:opacity-70">
                   ← رجوع
                 </button>
-                <button type="button" onClick={() => void handleSave()} disabled={saving}
-                  className="flex-[2] rounded-2xl bg-[#1D9E75] py-3 text-lg font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50">
+                <button type="button" onClick={() => void handleSave()} disabled={saving || !confirmed}
+                  className={`flex-[2] rounded-2xl py-3 text-lg font-bold text-white transition-all ${
+                    confirmed ? "bg-[#1D9E75] hover:opacity-90" : "bg-gray-300 cursor-not-allowed"
+                  } disabled:opacity-50`}>
                   {saving ? (
                     <span className="flex items-center justify-center gap-2">
                       <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
