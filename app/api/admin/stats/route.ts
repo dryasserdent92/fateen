@@ -74,7 +74,10 @@ export async function GET(req: NextRequest) {
     return exp && exp.lastDate.slice(0, 7) === thisYM;
   }).length;
   const totalExpenses   = (expenseRows ?? []).length;
-  const totalAmount     = Object.values(expensesByUser).reduce((s, u) => s + u.total, 0);
+  // نحسب المجموع من مصاريف المستخدمين مباشرةً حتى يتطابق مع ما يُعرض في جدول المستخدمين
+  const totalAmount     = Math.round(
+    Object.values(expensesByUser).reduce((s, u) => s + u.total, 0)
+  );
 
   /* ── نمو المستخدمين — آخر 6 أشهر ── */
   const monthlyGrowth = (() => {
@@ -106,7 +109,7 @@ export async function GET(req: NextRequest) {
         joinedAt:    u.created_at,
         lastSignIn:  u.last_sign_in_at ?? null,
         expenseCount: exp?.count ?? 0,
-        expenseTotal: exp?.total ?? 0,
+        expenseTotal: Math.round((exp?.total ?? 0) * 100) / 100,
         lastExpDate:  exp?.lastDate ?? null,
         topCategory:  exp ? Object.entries(exp.categories).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null : null,
         isActive,

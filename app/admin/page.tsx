@@ -251,7 +251,7 @@ export default function AdminDashboard() {
                   : null },
               { label: "نشطون هذا الشهر",  value: summary.activeThisMonth, icon: "🟢", sub: `${activeRate}% من الكل` },
               { label: "إجمالي المصاريف",   value: summary.totalExpenses,   icon: "🧾", sub: "عملية مسجّلة" },
-              { label: "مجموع المبالغ",      value: `${summary.totalAmount.toFixed(0)} ر.س`, icon: "💰", sub: "عبر كل الحسابات", raw: true },
+              { label: "مجموع المبالغ",      value: `${summary.totalAmount.toLocaleString("ar-SA-u-nu-latn")} ر.س`, icon: "💰", sub: "مجموع مصروفات كل المستخدمين", raw: true },
               { label: "المزود",              value: "Google", icon: "🔗", sub: "100% مستخدمين", raw: true },
             ].map((c, i) => (
               <div key={i} className="rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
@@ -406,6 +406,36 @@ export default function AdminDashboard() {
               👤 المستخدمون ({filteredUsers.length})
             </h2>
           </div>
+
+          {/* شريط المجموع */}
+          {filteredUsers.length > 0 && (() => {
+            const shownTotal  = filteredUsers.reduce((s, u) => s + u.expenseTotal, 0);
+            const shownCount  = filteredUsers.reduce((s, u) => s + u.expenseCount, 0);
+            const grandTotal  = stats!.summary.totalAmount;
+            const isFullMatch = filteredUsers.length === (stats?.users.length ?? 0);
+            return (
+              <div className="flex items-center justify-between gap-3 px-5 py-3 bg-[#1D9E75]/8 border-b border-[#1D9E75]/20">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-gray-500">
+                    {isFullMatch ? "∑ مجموع كل المستخدمين" : `∑ مجموع المعروضين (${filteredUsers.length})`}
+                  </span>
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-400">
+                    {shownCount} مصروف
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className={`text-sm font-extrabold ${isFullMatch && Math.round(shownTotal) === grandTotal ? "text-[#1D9E75]" : "text-orange-500"}`}>
+                    {Math.round(shownTotal).toLocaleString("ar-SA-u-nu-latn")} ر.س
+                  </span>
+                  {isFullMatch && (
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${Math.round(shownTotal) === grandTotal ? "bg-green-100 text-green-600" : "bg-orange-100 text-orange-500"}`}>
+                      {Math.round(shownTotal) === grandTotal ? "✓ يطابق المجموع الكلي" : `≠ الكلي: ${grandTotal.toLocaleString("ar-SA-u-nu-latn")} ر.س`}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="divide-y divide-gray-100">
             {filteredUsers.length === 0 && (
