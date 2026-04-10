@@ -65,6 +65,15 @@ export async function GET(req: NextRequest) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   })();
 
+  /* ── معرفات المستخدمين المعروفين ── */
+  const knownUserIds = new Set(users.map((u) => u.id));
+
+  /* ── مصاريف يتيمة (user_id غير موجود في auth) ── */
+  const orphanedRows = (expenseRows ?? []).filter((r) => !knownUserIds.has(r.user_id as string));
+  const orphanedTotal  = orphanedRows.reduce((s, r) => {
+    return s + (typeof r.amount === "number" ? r.amount : parseFloat(r.amount ?? "0") || 0);
+  }, 0);
+
   /* ── إحصائيات عامة ── */
   const totalUsers      = users.length;
   const newThisMonth    = users.filter((u) => u.created_at.slice(0, 7) === thisYM).length;
@@ -73,11 +82,10 @@ export async function GET(req: NextRequest) {
     const exp = expensesByUser[u.id];
     return exp && exp.lastDate.slice(0, 7) === thisYM;
   }).length;
-  const totalExpenses   = (expenseRows ?? []).length;
-  // نحسب المجموع من مصاريف المستخدمين مباشرةً حتى يتطابق مع ما يُعرض في جدول المستخدمين
-  const totalAmount     = Math.round(
-    Object.values(expensesByUser).reduce((s, u) => s + u.total, 0)
-  );
+  // نحصر عدد المصاريف ومجموعها بالمستخدمين المعروفين فقط
+  const totalExpenses   = (expenseRows ?? []).filter((r) => knownUserIds.has(r.user_id as string)).length;
+  // المجموع مشتق من userList مباشرةً → يتطابق دائماً مع ما يُعرض في الجدول
+  const totalAmount     = 0; // سيُحسب بعد بناء userList
 
   /* ── نمو المستخدمين — آخر 6 أشهر ── */
   const monthlyGrowth = (() => {
@@ -115,6 +123,9 @@ export async function GET(req: NextRequest) {
         isActive,
       };
     });
+
+  /* ── المجموع الكلي من userList مباشرةً (يطابق الجدول دائماً) ── */
+  const realTotalAmount = Math.round(userList.reduce((s, u) => s + u.expenseTotal, 0));
 
   /* ── أكثر التصنيفات استخداماً عبر كل المستخدمين ── */
   const allCatsCount: Record<string, number> = {};
@@ -166,7 +177,13 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => b.amount - a.amount);
 
   return NextResponse.json({
-    summary: { totalUsers, newThisMonth, newLastMonth, activeThisMonth, totalExpenses, totalAmount },
+    summary: {
+      totalUsers, newThisMonth, newLastMonth, activeThisMonth,
+      totalExpenses,
+      totalAmount: realTotalAmount,
+      orphanedCount: orphanedRows.length,
+      orphanedTotal: Math.round(orphanedTotal),
+    },
     monthlyGrowth,
     topCategories,
     engagementBuckets,

@@ -33,6 +33,8 @@ type Stats = {
     activeThisMonth: number;
     totalExpenses: number;
     totalAmount: number;
+    orphanedCount: number;
+    orphanedTotal: number;
   };
   monthlyGrowth:       MonthItem[];
   topCategories:       CatItem[];
@@ -405,6 +407,27 @@ export default function AdminDashboard() {
             <p className="mt-3 text-xs text-orange-500">
               💡 هذه المصاريف قد تكون بيانات فاسدة — احذفها من Supabase إذا كانت خاطئة. المصاريف الجديدة محدودة بـ 99,999 ر.س.
             </p>
+          </div>
+        )}
+
+        {/* 🔴 مصاريف يتيمة */}
+        {stats!.summary.orphanedCount > 0 && (
+          <div className="rounded-3xl bg-red-50 border border-red-200 p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">🔴</span>
+              <h2 className="text-sm font-bold text-red-700">
+                مصاريف يتيمة — غير مرتبطة بأي مستخدم ({stats!.summary.orphanedCount} مصروف)
+              </h2>
+            </div>
+            <p className="text-sm text-red-600 mb-3">
+              مجموعها <span className="font-extrabold">{stats!.summary.orphanedTotal.toLocaleString("ar-SA-u-nu-latn")} ر.س</span> — هذا هو سبب الفرق بين المجموع الكلي القديم والمبالغ الحالية.
+            </p>
+            <div className="rounded-2xl bg-white px-4 py-3 border border-red-100">
+              <p className="text-xs font-bold text-gray-500 mb-1">🧹 لحذفها نهائياً من Supabase SQL Editor:</p>
+              <code className="text-xs text-red-600 font-mono break-all">
+                DELETE FROM expenses WHERE user_id NOT IN (SELECT id FROM auth.users);
+              </code>
+            </div>
           </div>
         )}
 
