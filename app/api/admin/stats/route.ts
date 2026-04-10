@@ -6,6 +6,14 @@ import { getUserIdFromRequest } from "../../../../lib/auth";
 const ADMIN_EMAILS = ["almunajem.yasser@gmail.com", "dr.yasserdent92@gmail.com"];
 
 export async function GET(req: NextRequest) {
+  /* ── تحقق من كلمة المرور ── */
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminPassword) return NextResponse.json({ error: "ADMIN_PASSWORD غير مضبوط" }, { status: 500 });
+  const reqPassword = req.headers.get("x-admin-password");
+  if (reqPassword !== adminPassword) {
+    return NextResponse.json({ error: "كلمة المرور غير صحيحة" }, { status: 403 });
+  }
+
   /* ── تحقق من الهوية ── */
   const userId = await getUserIdFromRequest(req);
   if (!userId) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });

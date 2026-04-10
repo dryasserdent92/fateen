@@ -58,13 +58,39 @@ const PROVIDER_LABELS: Record<string, string> = {
 export default function AdminDashboard() {
   const router = useRouter();
   const [stats, setStats]         = useState<Stats | null>(null);
-  const [loading, setLoading]     = useState(true);
+  const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState<string | null>(null);
   const [search, setSearch]       = useState("");
   const [filterActive, setFilterActive] = useState<"all" | "active" | "inactive">("all");
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
 
-  useEffect(() => { void load(); }, []);
+  /* ── كلمة المرور ── */
+  const [password, setPassword]   = useState("");
+  const [unlocked, setUnlocked]   = useState(false);
+  const [pwError, setPwError]     = useState(false);
+
+  async function handleUnlock(e: React.FormEvent) {
+    e.preventDefault();
+    setPwError(false);
+    setLoading(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { router.push("/login"); return; }
+    const res = await fetch("/api/admin/stats", {
+      headers: {
+        "Authorization":    `Bearer ${session.access_token}`,
+        "x-admin-password": password,
+      },
+    });
+    if (res.ok) {
+      const data = await res.json() as Stats;
+      setStats(data);
+      setUnlocked(true);
+    } else {
+      setPwError(true);
+      setPassword("");
+    }
+    setLoading(false);
+  }
 
   async function load() {
     setLoading(true);
@@ -72,7 +98,10 @@ export default function AdminDashboard() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { router.push("/login"); return; }
     const res = await fetch("/api/admin/stats", {
-      headers: { "Authorization": `Bearer ${session.access_token}` },
+      headers: {
+        "Authorization":    `Bearer ${session.access_token}`,
+        "x-admin-password": password,
+      },
     });
     if (res.status === 403) { setError("ليس لديك صلاحية الوصول"); setLoading(false); return; }
     if (!res.ok)             { setError("حدث خطأ في تحميل البيانات"); setLoading(false); return; }
@@ -88,6 +117,53 @@ export default function AdminDashboard() {
   });
 
   const maxGrowth = Math.max(...(stats?.monthlyGrowth.map((m) => m.count) ?? [1]), 1);
+
+  /* ─── Password screen ─── */
+  if (!unlocked) return (
+    <main className="flex min-h-screen items-center justify-center bg-[#1D9E75] px-6">
+      <form onSubmit={(e) => void handleUnlock(e)}
+        className="w-full max-w-sm rounded-3xl bg-white p-8 shadow-xl space-y-5">
+        <div className="text-center">
+          <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl bg-[#1D9E75]/10 text-3xl">
+            🔐
+          </div>
+          <h1 className="text-xl font-extrabold text-gray-800">لوحة تحكم فطين</h1>
+          <p className="mt-1 text-sm text-gray-400">أدخل كلمة مرور الأدمن للمتابعة</p>
+        </div>
+
+        <div className="space-y-2">
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => { setPassword(e.target.value); setPwError(false); }}
+            placeholder="كلمة المرور"
+            autoFocus
+            className={`w-full rounded-2xl border px-4 py-3 text-center text-lg font-bold tracking-widest outline-none transition-colors focus:ring-2 focus:ring-[#1D9E75] ${
+              pwError ? "border-red-300 bg-red-50 text-red-600" : "border-gray-200 text-gray-800"
+            }`}
+          />
+          {pwError && (
+            <p className="text-center text-sm font-semibold text-red-500">
+              ❌ كلمة المرور غير صحيحة
+            </p>
+          )}
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading || !password}
+          className="w-full rounded-2xl bg-[#1D9E75] py-3.5 text-base font-bold text-white shadow transition-opacity hover:opacity-90 disabled:opacity-50"
+        >
+          {loading ? "⏳ جاري التحقق..." : "دخول →"}
+        </button>
+
+        <button type="button" onClick={() => router.push("/")}
+          className="w-full text-center text-sm text-gray-400 hover:text-gray-600">
+          ← العودة للرئيسية
+        </button>
+      </form>
+    </main>
+  );
 
   /* ─── Loading ─── */
   if (loading) return (
