@@ -34,8 +34,19 @@ function buildPrompt(inputLabel: string): string {
 }
 
 function parseClaudeText(text: string): ParsedExpense {
+  // نظّف markdown code blocks
   const clean = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  return JSON.parse(clean) as ParsedExpense;
+
+  // استخرج أول كائن JSON بالـ regex — يتجاهل أي نص قبله أو بعده
+  const match = clean.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error(`لا يوجد JSON في الرد: ${clean.slice(0, 100)}`);
+
+  // أصلح المسافات البيضاء الزائدة داخل القيم النصية التي تسبب أخطاء parse
+  const jsonStr = match[0].replace(/[\u0000-\u001F]/g, (c) =>
+    c === "\n" || c === "\r" || c === "\t" ? " " : ""
+  );
+
+  return JSON.parse(jsonStr) as ParsedExpense;
 }
 
 /* تحويل الأرقام العربية الهندية (٠-٩) إلى أرقام غربية (0-9) */
@@ -87,7 +98,7 @@ async function callClaude(
     },
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 300,
+      max_tokens: 1024,
       messages: [{ role: "user", content }],
     }),
   });
