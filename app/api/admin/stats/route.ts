@@ -113,9 +113,41 @@ export async function GET(req: NextRequest) {
       };
     });
 
+  /* ── أكثر التصنيفات استخداماً عبر كل المستخدمين ── */
+  const allCatsCount: Record<string, number> = {};
+  const allCatsAmount: Record<string, number> = {};
+  for (const row of expenseRows ?? []) {
+    const cat = (row.category as string) ?? "أخرى";
+    allCatsCount[cat]  = (allCatsCount[cat]  ?? 0) + 1;
+    allCatsAmount[cat] = (allCatsAmount[cat] ?? 0) +
+      (typeof row.amount === "number" ? row.amount : parseFloat(row.amount ?? "0") || 0);
+  }
+  const topCategories = Object.entries(allCatsCount)
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, count]) => ({ cat, count, amount: Math.round(allCatsAmount[cat] ?? 0) }));
+
+  /* ── توزيع المستخدمين حسب عدد مصاريفهم ── */
+  const engagementBuckets = { "0": 0, "1-5": 0, "6-20": 0, "21+": 0 };
+  for (const u of userList) {
+    if      (u.expenseCount === 0) engagementBuckets["0"]++;
+    else if (u.expenseCount <= 5)  engagementBuckets["1-5"]++;
+    else if (u.expenseCount <= 20) engagementBuckets["6-20"]++;
+    else                           engagementBuckets["21+"]++;
+  }
+
+  /* ── أعلى 5 مستخدمين إنفاقاً ── */
+  const topSpenders = [...userList]
+    .filter((u) => u.expenseTotal > 0)
+    .sort((a, b) => b.expenseTotal - a.expenseTotal)
+    .slice(0, 5)
+    .map((u) => ({ name: u.name, avatar: u.avatar, total: Math.round(u.expenseTotal), count: u.expenseCount }));
+
   return NextResponse.json({
     summary: { totalUsers, newThisMonth, newLastMonth, activeThisMonth, totalExpenses, totalAmount },
     monthlyGrowth,
+    topCategories,
+    engagementBuckets,
+    topSpenders,
     users: userList,
   });
 }

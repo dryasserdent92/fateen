@@ -20,7 +20,9 @@ type UserRow = {
   isActive: boolean;
 };
 
-type MonthItem = { ym: string; label: string; count: number };
+type MonthItem  = { ym: string; label: string; count: number };
+type CatItem    = { cat: string; count: number; amount: number };
+type SpenderRow = { name: string; avatar: string | null; total: number; count: number };
 
 type Stats = {
   summary: {
@@ -31,8 +33,11 @@ type Stats = {
     totalExpenses: number;
     totalAmount: number;
   };
-  monthlyGrowth: MonthItem[];
-  users: UserRow[];
+  monthlyGrowth:     MonthItem[];
+  topCategories:     CatItem[];
+  engagementBuckets: Record<string, number>;
+  topSpenders:       SpenderRow[];
+  users:             UserRow[];
 };
 
 /* ─── Helpers ─── */
@@ -63,6 +68,7 @@ export default function AdminDashboard() {
   const [search, setSearch]       = useState("");
   const [filterActive, setFilterActive] = useState<"all" | "active" | "inactive">("all");
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
+  const [deletingUser, setDeletingUser] = useState<string | null>(null);
 
   /* ── كلمة المرور ── */
   const [password, setPassword]   = useState("");
@@ -90,6 +96,31 @@ export default function AdminDashboard() {
       setPassword("");
     }
     setLoading(false);
+  }
+
+  async function handleDeleteUser(userId: string, userName: string) {
+    if (!confirm(`هل تريد حذف المستخدم "${userName}" وكل مصاريفه نهائياً؟ لا يمكن التراجع.`)) return;
+    setDeletingUser(userId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`/api/admin/delete-user?userId=${userId}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization":    `Bearer ${session!.access_token}`,
+          "x-admin-password": password,
+        },
+      });
+      if (res.ok) {
+        setStats((prev) => prev
+          ? { ...prev, users: prev.users.filter((u) => u.id !== userId) }
+          : prev);
+        setExpandedUser(null);
+      } else {
+        const j = await res.json() as { error?: string };
+        alert(j.error ?? "فشل الحذف");
+      }
+    } catch { alert("حدث خطأ"); }
+    finally { setDeletingUser(null); }
   }
 
   async function load() {
@@ -264,6 +295,89 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* ── رسوم إضافية ── */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+          {/* أكثر التصنيفات */}
+          <div className="rounded-3xl bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-sm font-bold text-gray-700">🏷️ أكثر التصنيفات استخداماً</h2>
+            <div className="space-y-2.5">
+              {(stats!.topCategories.slice(0, 6)).map(({ cat, count, amount }) => {
+                const maxCount = stats!.topCategories[0]?.count ?? 1;
+                const pct = Math.round((count / maxCount) * 100);
+                return (
+                  <div key={cat}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-gray-700">
+                        {CATEGORY_ICONS[cat] ?? "💳"} {cat}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400">{count}×</span>
+                        <span className="text-xs font-bold text-[#1D9E75]">{amount} ر.س</span>
+                      </div>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-gray-100">
+                      <div className="h-2 rounded-full bg-[#1D9E75] transition-all"
+                        style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* توزيع التفاعل */}
+          <div className="rounded-3xl bg-white p-5 shadow-sm space-y-4">
+            <h2 className="text-sm font-bold text-gray-700">📊 توزيع المستخدمين حسب النشاط</h2>
+            <div className="space-y-3">
+              {Object.entries(stats!.engagementBuckets).map(([bucket, count]) => {
+                const total = stats!.summary.totalUsers || 1;
+                const pct   = Math.round((count / total) * 100);
+                const labels: Record<string, string> = {
+                  "0": "لم يبدأ بعد", "1-5": "مبتدئ (1-5)", "6-20": "نشط (6-20)", "21+": "متحمس (21+)",
+                };
+                const colors: Record<string, string> = {
+                  "0": "bg-gray-200", "1-5": "bg-blue-300", "6-20": "bg-[#1D9E75]/60", "21+": "bg-[#1D9E75]",
+                };
+                return (
+                  <div key={bucket}>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs font-semibold text-gray-600">{labels[bucket]}</span>
+                      <span className="text-xs text-gray-400">{count} ({pct}%)</span>
+                    </div>
+                    <div className="h-2.5 w-full rounded-full bg-gray-100">
+                      <div className={`h-2.5 rounded-full ${colors[bucket]} transition-all`}
+                        style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* أعلى المنفقين */}
+            {stats!.topSpenders.length > 0 && (
+              <div className="pt-3 border-t border-gray-100">
+                <p className="mb-3 text-xs font-bold text-gray-500">💰 أعلى المنفقين</p>
+                <div className="space-y-2">
+                  {stats!.topSpenders.map((s, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className={`flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-extrabold text-white ${
+                        i === 0 ? "bg-yellow-400" : i === 1 ? "bg-gray-400" : "bg-orange-300"
+                      }`}>{i + 1}</span>
+                      {s.avatar
+                        ? <img src={s.avatar} className="size-6 rounded-full object-cover shrink-0" />
+                        : <div className="size-6 rounded-full bg-[#1D9E75]/15 flex items-center justify-center text-xs shrink-0">👤</div>
+                      }
+                      <p className="flex-1 text-xs font-semibold text-gray-700 truncate">{s.name}</p>
+                      <p className="text-xs font-bold text-[#1D9E75] shrink-0">{s.total} ر.س</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* فلتر وبحث */}
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -372,6 +486,18 @@ export default function AdminDashboard() {
                             {u.isActive ? "🟢 نشط هذا الشهر" : u.expenseCount > 0 ? "🟡 غير نشط" : "⚪ لم يبدأ بعد"}
                           </p>
                         </div>
+                      </div>
+
+                      {/* زر الحذف */}
+                      <div className="mt-3">
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteUser(u.id, u.name)}
+                          disabled={deletingUser === u.id}
+                          className="w-full rounded-2xl border border-red-200 bg-red-50 py-2.5 text-sm font-bold text-red-500 transition-opacity hover:opacity-80 disabled:opacity-50"
+                        >
+                          {deletingUser === u.id ? "⏳ جاري الحذف..." : "🗑 حذف هذا المستخدم وكل مصاريفه"}
+                        </button>
                       </div>
                     </div>
                   )}
