@@ -521,104 +521,76 @@ export default function AddExpensePage() {
                   </select>
                 </div>
 
-                {/* ── الأصناف المتعددة (قابلة للتعديل) ── */}
+                {/* ── الأصناف المتعددة ── */}
                 {expense.items && expense.items.length > 0 ? (
-                  <div className="rounded-2xl border border-[#1D9E75]/20 bg-[#1D9E75]/5 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold text-[#1D9E75] uppercase tracking-wide">
-                        🛒 الأصناف ({expense.items.length})
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newItem: ExpenseItem = { name: "", brand: null, quantity: 1, unit_price: 0, total_price: 0 };
-                          const updated = [...expense.items!, newItem];
-                          setExpense((p) => ({ ...p, items: updated }));
-                        }}
-                        className="text-xs font-bold text-[#1D9E75] bg-white border border-[#1D9E75]/30 rounded-xl px-3 py-1 hover:bg-[#1D9E75]/10"
-                      >
-                        + إضافة صنف
-                      </button>
-                    </div>
+                  <div className="rounded-2xl border border-[#1D9E75]/20 bg-[#1D9E75]/5 p-3 space-y-2">
 
-                    <div className="space-y-2 max-h-72 overflow-y-auto">
+                    {/* Header */}
+                    <p className="text-xs font-bold text-[#1D9E75] px-1">
+                      🛒 الأصناف ({expense.items.length})
+                    </p>
+
+                    {/* قائمة الأصناف */}
+                    <div className="space-y-1.5 max-h-72 overflow-y-auto">
                       {expense.items.map((item, idx) => (
-                        <div key={idx} className="rounded-xl bg-white border border-[#1D9E75]/15 p-3 space-y-2">
-                          {/* اسم الصنف + زر الحذف */}
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={item.name}
-                              onChange={(e) => {
-                                const updated = [...expense.items!];
-                                updated[idx] = { ...updated[idx]!, name: e.target.value };
-                                setExpense((p) => ({ ...p, items: updated }));
-                              }}
-                              placeholder="اسم الصنف"
-                              className="flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-sm text-gray-800 outline-none focus:border-[#1D9E75]"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const updated = expense.items!.filter((_, i) => i !== idx);
-                                const newTotal = updated.reduce((s, it) => s + it.total_price, 0);
-                                setExpense((p) => ({
-                                  ...p,
-                                  items: updated.length > 0 ? updated : null,
-                                  amount: newTotal > 0 ? String(newTotal.toFixed(2)) : p.amount,
-                                }));
-                              }}
-                              className="shrink-0 text-red-400 hover:text-red-600 text-lg leading-none"
-                              title="حذف الصنف"
-                            >
-                              ×
-                            </button>
-                          </div>
-
-                          {/* الكمية × السعر = المجموع */}
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1">
-                              <p className="text-[10px] text-gray-400 mb-0.5">الكمية</p>
-                              <input
-                                type="number" min="1" step="1"
-                                value={item.quantity}
-                                onChange={(e) => {
-                                  const qty = parseFloat(e.target.value) || 1;
-                                  const updated = [...expense.items!];
-                                  const total = parseFloat((qty * updated[idx]!.unit_price).toFixed(2));
-                                  updated[idx] = { ...updated[idx]!, quantity: qty, total_price: total };
-                                  const newTotal = updated.reduce((s, it) => s + it.total_price, 0);
-                                  setExpense((p) => ({ ...p, items: updated, amount: String(newTotal.toFixed(2)) }));
-                                }}
-                                className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm text-gray-800 outline-none focus:border-[#1D9E75]"
-                              />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-[10px] text-gray-400 mb-0.5">سعر الوحدة</p>
-                              <input
-                                type="number" min="0" step="0.01"
-                                value={item.unit_price}
-                                onChange={(e) => {
-                                  const price = parseFloat(e.target.value) || 0;
-                                  const updated = [...expense.items!];
-                                  const total = parseFloat((updated[idx]!.quantity * price).toFixed(2));
-                                  updated[idx] = { ...updated[idx]!, unit_price: price, total_price: total };
-                                  const newTotal = updated.reduce((s, it) => s + it.total_price, 0);
-                                  setExpense((p) => ({ ...p, items: updated, amount: String(newTotal.toFixed(2)) }));
-                                }}
-                                className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm text-gray-800 outline-none focus:border-[#1D9E75]"
-                              />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-[10px] text-gray-400 mb-0.5">الإجمالي</p>
-                              <div className="rounded-lg bg-[#1D9E75]/10 border border-[#1D9E75]/20 px-2 py-1.5 text-sm font-bold text-[#1D9E75] text-center">
-                                {item.total_price.toFixed(2)}
-                              </div>
-                            </div>
-                          </div>
+                        <div key={idx} className="flex items-center gap-2 rounded-xl bg-white border border-gray-100 px-3 py-2">
+                          {/* الاسم */}
+                          <input
+                            type="text"
+                            value={item.name}
+                            onChange={(e) => {
+                              const updated = [...expense.items!];
+                              updated[idx] = { ...updated[idx]!, name: e.target.value };
+                              setExpense((p) => ({ ...p, items: updated }));
+                            }}
+                            placeholder="اسم الصنف"
+                            className="flex-1 min-w-0 bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-300"
+                          />
+                          {/* السعر */}
+                          <input
+                            type="number" min="0" step="0.01"
+                            value={item.total_price || ""}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              const updated = [...expense.items!];
+                              updated[idx] = { ...updated[idx]!, total_price: val, unit_price: val, quantity: 1 };
+                              const newTotal = updated.reduce((s, it) => s + it.total_price, 0);
+                              setExpense((p) => ({ ...p, items: updated, amount: String(newTotal.toFixed(2)) }));
+                            }}
+                            placeholder="0.00"
+                            className="w-20 shrink-0 rounded-lg bg-[#1D9E75]/8 border-0 px-2 py-1 text-sm font-bold text-[#1D9E75] text-center outline-none focus:ring-1 focus:ring-[#1D9E75]/40"
+                          />
+                          {/* حذف */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = expense.items!.filter((_, i) => i !== idx);
+                              const newTotal = updated.reduce((s, it) => s + it.total_price, 0);
+                              setExpense((p) => ({
+                                ...p,
+                                items: updated.length > 0 ? updated : null,
+                                amount: updated.length > 0 ? String(newTotal.toFixed(2)) : p.amount,
+                              }));
+                            }}
+                            className="shrink-0 size-6 flex items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-400 transition-colors text-base leading-none"
+                          >
+                            ×
+                          </button>
                         </div>
                       ))}
                     </div>
+
+                    {/* زر إضافة صنف */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newItem: ExpenseItem = { name: "", brand: null, quantity: 1, unit_price: 0, total_price: 0 };
+                        setExpense((p) => ({ ...p, items: [...p.items!, newItem] }));
+                      }}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-[#1D9E75]/40 py-2 text-sm font-semibold text-[#1D9E75] hover:bg-[#1D9E75]/5 transition-colors"
+                    >
+                      + إضافة صنف
+                    </button>
 
                     {/* مجموع الأصناف */}
                     <div className="flex items-center justify-between rounded-xl bg-[#1D9E75]/15 px-4 py-2.5">
