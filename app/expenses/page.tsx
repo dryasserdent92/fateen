@@ -6,6 +6,7 @@ import { supabase } from "../../lib/supabase";
 import { apiUrl } from "../../lib/api-client";
 import AuthGuard from "../components/auth-guard";
 import BottomNav from "../components/bottom-nav";
+import { loadSettings, getPeriodStart } from "../../lib/user-settings";
 
 type ExpenseItem = {
   name: string;
@@ -179,18 +180,24 @@ export default function ExpensesPage() {
     }
   }
 
+  /* إعدادات المستخدم */
+  const settings = loadSettings();
+
   /* تاريخ اليوم بتوقيت السعودية — نص نظيف "YYYY-MM-DD" */
   const todaySAStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
-  const currentYearMonth = todaySAStr.slice(0, 7); /* "2026-04" */
+
+  /* بداية الفترة الحالية بناءً على يوم البداية المخصص */
+  const periodStart = getPeriodStart(todaySAStr, settings.startDay);
+
+  /* إجمالي الفترة الحالية فقط */
   const currentMonthTotal = expenses.reduce((sum, expense) => {
     if (!expense.date) return sum;
-    return expense.date.slice(0, 7) === currentYearMonth
-      ? sum + toNumber(expense.amount)
-      : sum;
+    return expense.date >= periodStart ? sum + toNumber(expense.amount) : sum;
   }, 0);
 
-  /* ملخص التصنيفات */
-  const categoryStats = expenses.reduce<Record<string, { total: number; count: number }>>((acc, expense) => {
+  /* ملخص التصنيفات للفترة الحالية فقط (الإصلاح الرئيسي) */
+  const periodExpenses = expenses.filter(e => e.date && e.date >= periodStart);
+  const categoryStats = periodExpenses.reduce<Record<string, { total: number; count: number }>>((acc, expense) => {
     const cat = expense.category ?? "أخرى";
     if (!acc[cat]) acc[cat] = { total: 0, count: 0 };
     acc[cat]!.total += toNumber(expense.amount);
@@ -198,6 +205,9 @@ export default function ExpensesPage() {
     return acc;
   }, {});
   const sortedCategories = Object.entries(categoryStats).sort((a, b) => b[1].total - a[1].total);
+
+  /* المتبقي من الميزانية */
+  const remaining = settings.budget > 0 ? settings.budget - currentMonthTotal : null;
 
   const allSelected = visibleExpenses.length > 0 && selected.size === visibleExpenses.length;
 
@@ -245,12 +255,43 @@ export default function ExpensesPage() {
               <h1 className="text-3xl font-extrabold text-[#1D9E75]">مصاريفي</h1>
             </div>
 
-            <div className="mt-5 rounded-2xl bg-[#1D9E75]/5 p-4">
-              <p className="text-xs font-medium text-gray-500">إجمالي الشهر الحالي</p>
-              <p className="mt-1 text-4xl font-extrabold text-[#1D9E75]">
-                {currentMonthTotal.toFixed(2)}
-                <span className="mr-1 text-lg font-semibold text-gray-400">ر.س</span>
-              </p>
+            <div className="mt-5 rounded-2xl bg-[#1D9E75]/5 p-4 space-y-3">
+              <div>
+                <p className="text-xs font-medium text-gray-500">
+                  إجمالي الفترة الحالية
+                  {settings.startDay !== 1 && (
+                    <span className="mr-1 text-gray-400">(منذ {settings.startDay} الشهر)</span>
+                  )}
+                </p>
+                <p className="mt-1 text-4xl font-extrabold text-[#1D9E75]">
+                  {currentMonthTotal.toFixed(2)}
+                  <span className="mr-1 text-lg font-semibold text-gray-400">ر.س</span>
+                </p>
+              </div>
+
+              {/* شريط الميزانية */}
+              {remaining !== null && (
+                <div className="border-t border-[#1D9E75]/10 pt-3 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500">الميزانية: {settings.budget.toLocaleString()} ر.س</span>
+                    <span className={`font-bold ${remaining >= 0 ? "text-[#1D9E75]" : "text-red-500"}`}>
+                      {remaining >= 0 ? `متبقي ${remaining.toFixed(0)}` : `تجاوزت ${Math.abs(remaining).toFixed(0)}`} ر.س
+                    </span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-[#1D9E75]/15 overflow-hidden">
+                    <div
+                      className={`h-2 rounded-full transition-all ${
+                        currentMonthTotal / settings.budget > 0.9 ? "bg-red-400" :
+                        currentMonthTotal / settings.budget > 0.7 ? "bg-amber-400" : "bg-[#1D9E75]"
+                      }`}
+                      style={{ width: `${Math.min((currentMonthTotal / settings.budget) * 100, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 text-left">
+                    {Math.min((currentMonthTotal / settings.budget) * 100, 100).toFixed(0)}% من الميزانية
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* ملخص التصنيفات */}

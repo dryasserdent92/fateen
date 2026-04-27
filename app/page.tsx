@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "../lib/supabase";
 import { apiUrl } from "../lib/api-client";
 import BottomNav from "./components/bottom-nav";
+import { loadSettings, getPeriodStart } from "../lib/user-settings";
 
 type RecentExpense = {
   id: number | string;
@@ -114,23 +115,31 @@ export default function Home() {
       .limit(5);
     setRecentExpenses(recent ?? []);
 
-    /* إجمالي الشهر الحالي — نص "YYYY-MM" بتوقيت السعودية */
-    const todaySAStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }); // "2026-04-09"
-    const monthStart = todaySAStr.slice(0, 7) + "-01"; // "2026-04-01"
+    /* إجمالي الفترة الحالية بناءً على يوم البداية المخصص */
+    const todaySAStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+    const settings = loadSettings();
+    const periodStart = getPeriodStart(todaySAStr, settings.startDay);
     const { data: monthData } = await supabase
       .from("expenses")
       .select("amount")
       .eq("user_id", userId)
-      .gte("date", monthStart);
+      .gte("date", periodStart);
     const total = (monthData ?? []).reduce((s, e) => s + toNumber(e.amount), 0);
     setMonthTotal(total);
 
     setLoading(false);
   }
 
-  const monthNames = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
-  const nowSAStr2 = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }); // "2026-04-09"
-  const currentMonthName = monthNames[parseInt(nowSAStr2.slice(5, 7)) - 1];
+  const settings = loadSettings();
+  const nowSAStr2 = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+  const periodStart2 = getPeriodStart(nowSAStr2, settings.startDay);
+  const periodLabel = settings.startDay === 1
+    ? (() => {
+        const monthNames = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+        return monthNames[parseInt(nowSAStr2.slice(5, 7)) - 1] ?? "";
+      })()
+    : `منذ ${periodStart2.slice(8)}-${periodStart2.slice(5,7)}`;
+  const remaining2 = settings.budget > 0 && monthTotal !== null ? settings.budget - monthTotal : null;
 
   /* غير مسجل دخول */
   if (!isLoggedIn && !loading) {
@@ -179,7 +188,7 @@ export default function Home() {
 
           {/* بطاقة الشهر */}
           <div className="rounded-3xl bg-white p-6 shadow-lg">
-            <p className="text-xs font-semibold text-gray-400">إجمالي {currentMonthName}</p>
+            <p className="text-xs font-semibold text-gray-400">إجمالي {periodLabel}</p>
             {loading ? (
               <div className="mt-2 h-10 w-40 animate-pulse rounded-xl bg-gray-100" />
             ) : (
@@ -190,6 +199,27 @@ export default function Home() {
             )}
             {!loading && expenseCount !== null && (
               <p className="mt-1 text-xs text-gray-400">{expenseCount} مصروف مسجّل</p>
+            )}
+
+            {/* شريط الميزانية */}
+            {!loading && remaining2 !== null && monthTotal !== null && (
+              <div className="mt-3 rounded-xl bg-gray-50 p-3 space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-400">الميزانية {settings.budget.toLocaleString()} ر.س</span>
+                  <span className={`font-bold ${remaining2 >= 0 ? "text-[#1D9E75]" : "text-red-500"}`}>
+                    {remaining2 >= 0 ? `✅ متبقي ${remaining2.toFixed(0)}` : `⚠️ تجاوزت ${Math.abs(remaining2).toFixed(0)}`} ر.س
+                  </span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
+                  <div
+                    className={`h-2 rounded-full transition-all ${
+                      monthTotal / settings.budget > 0.9 ? "bg-red-400" :
+                      monthTotal / settings.budget > 0.7 ? "bg-amber-400" : "bg-[#1D9E75]"
+                    }`}
+                    style={{ width: `${Math.min((monthTotal / settings.budget) * 100, 100)}%` }}
+                  />
+                </div>
+              </div>
             )}
 
             {/* مستخدم جديد */}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import AuthGuard from "../components/auth-guard";
 import BottomNav from "../components/bottom-nav";
+import { loadSettings, saveSettings } from "../../lib/user-settings";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -12,6 +13,9 @@ export default function SettingsPage() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [startDay, setStartDay] = useState<number>(1);
+  const [budget, setBudget] = useState<number>(0);
+  const [settingsSaved, setSettingsSaved] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -24,7 +28,16 @@ export default function SettingsPage() {
         setUserAvatar(avatar);
       }
     });
+    const s = loadSettings();
+    setStartDay(s.startDay);
+    setBudget(s.budget);
   }, []);
+
+  function handleSaveSettings() {
+    saveSettings({ startDay, budget });
+    setSettingsSaved(true);
+    setTimeout(() => setSettingsSaved(false), 2500);
+  }
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -62,6 +75,53 @@ export default function SettingsPage() {
                 </span>
               </div>
             </div>
+          </div>
+
+          {/* إعدادات الشهر والميزانية */}
+          <div className="rounded-3xl bg-white p-5 shadow-lg space-y-4">
+            <p className="text-xs font-bold text-gray-400 px-1">إعدادات المصاريف</p>
+
+            {/* يوم بداية الشهر */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-gray-700">📅 يوم بداية الشهر</label>
+              <p className="text-xs text-gray-400">مثال: 27 يعني الشهر يبدأ في اليوم 27 من كل شهر</p>
+              <div className="flex items-center gap-3 mt-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={startDay}
+                  onChange={e => setStartDay(Math.min(28, Math.max(1, parseInt(e.target.value) || 1)))}
+                  className="w-24 rounded-xl border border-gray-200 px-3 py-2 text-center text-lg font-bold text-[#1D9E75] outline-none focus:border-[#1D9E75]"
+                />
+                <span className="text-sm text-gray-500">من كل شهر</span>
+              </div>
+            </div>
+
+            {/* الميزانية */}
+            <div className="space-y-1.5 border-t border-gray-100 pt-4">
+              <label className="text-sm font-semibold text-gray-700">💰 الميزانية الشهرية</label>
+              <p className="text-xs text-gray-400">اتركها 0 إذا لم تريد تحديد ميزانية</p>
+              <div className="flex items-center gap-2 mt-2">
+                <input
+                  type="number"
+                  min={0}
+                  value={budget === 0 ? "" : budget}
+                  placeholder="0"
+                  onChange={e => setBudget(parseFloat(e.target.value) || 0)}
+                  className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-lg font-bold text-[#1D9E75] outline-none focus:border-[#1D9E75]"
+                />
+                <span className="text-sm text-gray-500 flex-shrink-0">ر.س</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSaveSettings}
+              className="w-full rounded-2xl bg-[#1D9E75] py-3 text-base font-bold text-white shadow transition-opacity hover:opacity-90"
+            >
+              {settingsSaved ? "✅ تم الحفظ!" : "حفظ الإعدادات"}
+            </button>
           </div>
 
           {/* App info */}
