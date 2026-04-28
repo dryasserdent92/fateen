@@ -705,18 +705,21 @@ export default function ExpensesPage() {
           />
 
           {/* البطاقة */}
-          <div className="relative w-full max-w-xl rounded-t-3xl bg-white px-5 pb-10 pt-5 shadow-2xl">
-            {/* مقبض */}
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-200" />
-
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-extrabold text-gray-800">تعديل الفاتورة</h2>
-              <button
-                onClick={() => setEditingExpense(null)}
-                className="rounded-full bg-gray-100 p-2 text-gray-400 hover:bg-gray-200"
-              >✕</button>
+          <div className="relative w-full max-w-xl rounded-t-3xl bg-white shadow-2xl flex flex-col" style={{ maxHeight: "90dvh" }}>
+            {/* Header ثابت */}
+            <div className="px-5 pt-5 pb-3 flex-shrink-0">
+              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-200" />
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-extrabold text-gray-800">تعديل الفاتورة</h2>
+                <button
+                  onClick={() => setEditingExpense(null)}
+                  className="rounded-full bg-gray-100 p-2 text-gray-400 hover:bg-gray-200"
+                >✕</button>
+              </div>
             </div>
 
+            {/* المحتوى القابل للتمرير */}
+            <div className="overflow-y-auto flex-1 px-5 pb-4">
             <div className="space-y-4">
               {/* اسم المحل */}
               <div>
@@ -879,7 +882,11 @@ export default function ExpensesPage() {
                 )}
               </div>
 
-              {/* زر الحفظ */}
+            </div>
+            </div>
+
+            {/* زر الحفظ ثابت في الأسفل */}
+            <div className="flex-shrink-0 px-5 pb-8 pt-3 border-t border-gray-100 bg-white">
               <button
                 type="button"
                 onClick={() => void handleSaveEdit()}
