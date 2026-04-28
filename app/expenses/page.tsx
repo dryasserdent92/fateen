@@ -76,8 +76,10 @@ export default function ExpensesPage() {
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<number | string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [userSettings, setUserSettings] = useState({ startDay: 1, budget: 0 });
 
   useEffect(() => {
+    setUserSettings(loadSettings());
     void fetchExpenses();
   }, []);
 
@@ -180,14 +182,11 @@ export default function ExpensesPage() {
     }
   }
 
-  /* إعدادات المستخدم */
-  const settings = loadSettings();
-
   /* تاريخ اليوم بتوقيت السعودية — نص نظيف "YYYY-MM-DD" */
   const todaySAStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
 
   /* بداية الفترة الحالية بناءً على يوم البداية المخصص */
-  const periodStart = getPeriodStart(todaySAStr, settings.startDay);
+  const periodStart = getPeriodStart(todaySAStr, userSettings.startDay);
 
   /* إجمالي الفترة الحالية فقط */
   const currentMonthTotal = expenses.reduce((sum, expense) => {
@@ -207,7 +206,7 @@ export default function ExpensesPage() {
   const sortedCategories = Object.entries(categoryStats).sort((a, b) => b[1].total - a[1].total);
 
   /* المتبقي من الميزانية */
-  const remaining = settings.budget > 0 ? settings.budget - currentMonthTotal : null;
+  const remaining = userSettings.budget > 0 ? userSettings.budget - currentMonthTotal : null;
 
   const allSelected = visibleExpenses.length > 0 && selected.size === visibleExpenses.length;
 
@@ -259,8 +258,8 @@ export default function ExpensesPage() {
               <div>
                 <p className="text-xs font-medium text-gray-500">
                   إجمالي الفترة الحالية
-                  {settings.startDay !== 1 && (
-                    <span className="mr-1 text-gray-400">(منذ {settings.startDay} الشهر)</span>
+                  {userSettings.startDay !== 1 && (
+                    <span className="mr-1 text-gray-400">(منذ {userSettings.startDay} الشهر)</span>
                   )}
                 </p>
                 <p className="mt-1 text-4xl font-extrabold text-[#1D9E75]">
@@ -273,7 +272,7 @@ export default function ExpensesPage() {
               {remaining !== null && (
                 <div className="border-t border-[#1D9E75]/10 pt-3 space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-500">الميزانية: {settings.budget.toLocaleString()} ر.س</span>
+                    <span className="text-gray-500">الميزانية: {userSettings.budget.toLocaleString()} ر.س</span>
                     <span className={`font-bold ${remaining >= 0 ? "text-[#1D9E75]" : "text-red-500"}`}>
                       {remaining >= 0 ? `متبقي ${remaining.toFixed(0)}` : `تجاوزت ${Math.abs(remaining).toFixed(0)}`} ر.س
                     </span>
@@ -281,10 +280,10 @@ export default function ExpensesPage() {
                   <div className="h-2 w-full rounded-full bg-[#1D9E75]/15 overflow-hidden">
                     <div
                       className={`h-2 rounded-full transition-all ${
-                        currentMonthTotal / settings.budget > 0.9 ? "bg-red-400" :
-                        currentMonthTotal / settings.budget > 0.7 ? "bg-amber-400" : "bg-[#1D9E75]"
+                        currentMonthTotal / userSettings.budget > 0.9 ? "bg-red-400" :
+                        currentMonthTotal / userSettings.budget > 0.7 ? "bg-amber-400" : "bg-[#1D9E75]"
                       }`}
-                      style={{ width: `${Math.min((currentMonthTotal / settings.budget) * 100, 100)}%` }}
+                      style={{ width: `${Math.min((currentMonthTotal / userSettings.budget) * 100, 100)}%` }}
                     />
                   </div>
                   <p className="text-xs text-gray-400 text-left">

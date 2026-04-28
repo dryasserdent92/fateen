@@ -20,7 +20,10 @@ type ParsedExpense = {
 };
 
 function buildPrompt(inputLabel: string): string {
+  const currentYear = new Date().getFullYear(); // 2026
   return `أنت مساعد متخصص في قراءة الفواتير السعودية. استخرج من ${inputLabel} البيانات وأرجع JSON صحيح فقط — بدون أي نص قبله أو بعده.
+
+السنة الحالية: ${currentYear} — إذا ظهرت سنة مكونة من رقمين مثل "26" فاعتبرها ${currentYear}.
 
 الشكل المطلوب:
 {"store":"اسم المتجر","amount":0,"date":"YYYY-MM-DD","category":"التصنيف","item_name":null,"item_brand":null,"items":[{"name":"اسم الصنف","brand":null,"quantity":1,"unit_price":0,"total_price":0}]}
@@ -87,10 +90,51 @@ function toWesternDigits(str: string): string {
   );
 }
 
+/** تصحيح التاريخ: يعالج السنة ذات الرقمين والصيغ المختلفة */
+function fixDate(raw: string): string {
+  if (!raw) return raw;
+  const s = raw.trim();
+
+  // صيغة YYYY-MM-DD أو YY-MM-DD (مع شرطات)
+  const isoLike = s.match(/^(\d{2,4})[.\-/](\d{1,2})[.\-/](\d{1,2})$/);
+  if (isoLike) {
+    const [, p1, p2, p3] = isoLike as [string, string, string, string];
+    let y = parseInt(p1), m = parseInt(p2), d = parseInt(p3);
+    // إذا كان p1 <= 31 وp3 >= 2000 → الصيغة DD-MM-YYYY
+    if (y <= 31 && d >= 2000) { [y, d] = [d, y]; }
+    // سنة بـ رقمين
+    if (y < 100) y += 2000;
+    // تحقق من المنطقية
+    if (y >= 2020 && y <= 2099 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    }
+  }
+
+  // صيغة DD/MM/YY أو DD-MM-YY
+  const dmyLike = s.match(/^(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})$/);
+  if (dmyLike) {
+    const [, d, m, p3] = dmyLike as [string, string, string, string];
+    let y = parseInt(p3);
+    if (y < 100) y += 2000;
+    const day = parseInt(d), mon = parseInt(m);
+    if (y >= 2020 && y <= 2099 && mon >= 1 && mon <= 12 && day >= 1 && day <= 31) {
+      return `${y}-${String(mon).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+    }
+  }
+
+  return s;
+}
+
 function normalizeExpense(parsed: ParsedExpense) {
-  const today = new Date().toISOString().split("T")[0];
-  const normalizedDate =
-    typeof parsed.date === "string" && parsed.date.trim() ? parsed.date : today;
+  const today = new Date().toISOString().split("T")[0]!;
+  const rawDate = typeof parsed.date === "string" && parsed.date.trim() ? parsed.date.trim() : today;
+  const normalizedDate = fixDate(rawDate);
+
+  // تحقق نهائي: لو السنة خرجت 4 أرقام بدء من 20 فهي صحيحة
+  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)
+    && parseInt(normalizedDate.slice(0,4)) >= 2020
+    ? normalizedDate : today;
+
   const rawAmount = toWesternDigits(parsed.amount?.toString() ?? "")
     .replace(/[^\d.]/g, "");
   const amount = parseFloat(rawAmount || "0");
@@ -98,7 +142,7 @@ function normalizeExpense(parsed: ParsedExpense) {
   return {
     store:      parsed.store ?? null,
     amount,
-    date:       normalizedDate,
+    date:       validDate,
     category:   parsed.category ?? "أخرى",
     item_name:  parsed.item_name ?? null,
     item_brand: parsed.item_brand ?? null,

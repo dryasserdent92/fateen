@@ -45,6 +45,13 @@ export default function Home() {
   const [recentExpenses, setRecentExpenses] = useState<RecentExpense[]>([]);
   const [loading, setLoading]             = useState(true);
   const [deletingId, setDeletingId]       = useState<number | string | null>(null);
+  const [userBudget, setUserBudget]       = useState<number>(0);
+
+  useEffect(() => {
+    // نحمّل الإعدادات من localStorage بعد ما يفتح المتصفح
+    const s = loadSettings();
+    setUserBudget(s.budget);
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -130,16 +137,8 @@ export default function Home() {
     setLoading(false);
   }
 
-  const settings = loadSettings();
   const nowSAStr2 = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
-  const periodStart2 = getPeriodStart(nowSAStr2, settings.startDay);
-  const periodLabel = settings.startDay === 1
-    ? (() => {
-        const monthNames = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
-        return monthNames[parseInt(nowSAStr2.slice(5, 7)) - 1] ?? "";
-      })()
-    : `منذ ${periodStart2.slice(8)}-${periodStart2.slice(5,7)}`;
-  const remaining2 = settings.budget > 0 && monthTotal !== null ? settings.budget - monthTotal : null;
+  const remaining2 = userBudget > 0 && monthTotal !== null ? userBudget - monthTotal : null;
 
   /* غير مسجل دخول */
   if (!isLoggedIn && !loading) {
@@ -188,7 +187,7 @@ export default function Home() {
 
           {/* بطاقة الشهر */}
           <div className="rounded-3xl bg-white p-6 shadow-lg">
-            <p className="text-xs font-semibold text-gray-400">إجمالي {periodLabel}</p>
+            <p className="text-xs font-semibold text-gray-400">إجمالي الشهر الحالي</p>
             {loading ? (
               <div className="mt-2 h-10 w-40 animate-pulse rounded-xl bg-gray-100" />
             ) : (
@@ -205,7 +204,7 @@ export default function Home() {
             {!loading && remaining2 !== null && monthTotal !== null && (
               <div className="mt-3 rounded-xl bg-gray-50 p-3 space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-400">الميزانية {settings.budget.toLocaleString()} ر.س</span>
+                  <span className="text-gray-400">الميزانية {userBudget.toLocaleString()} ر.س</span>
                   <span className={`font-bold ${remaining2 >= 0 ? "text-[#1D9E75]" : "text-red-500"}`}>
                     {remaining2 >= 0 ? `✅ متبقي ${remaining2.toFixed(0)}` : `⚠️ تجاوزت ${Math.abs(remaining2).toFixed(0)}`} ر.س
                   </span>
@@ -213,10 +212,10 @@ export default function Home() {
                 <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
                   <div
                     className={`h-2 rounded-full transition-all ${
-                      monthTotal / settings.budget > 0.9 ? "bg-red-400" :
-                      monthTotal / settings.budget > 0.7 ? "bg-amber-400" : "bg-[#1D9E75]"
+                      monthTotal / userBudget > 0.9 ? "bg-red-400" :
+                      monthTotal / userBudget > 0.7 ? "bg-amber-400" : "bg-[#1D9E75]"
                     }`}
-                    style={{ width: `${Math.min((monthTotal / settings.budget) * 100, 100)}%` }}
+                    style={{ width: `${Math.min((monthTotal / userBudget) * 100, 100)}%` }}
                   />
                 </div>
               </div>
