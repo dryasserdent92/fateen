@@ -78,6 +78,14 @@ export default function ExpensesPage() {
   const [deleting, setDeleting] = useState(false);
   const [userSettings, setUserSettings] = useState({ startDay: 1, budget: 0 });
 
+  /* التعديل */
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [editStore, setEditStore]       = useState("");
+  const [editAmount, setEditAmount]     = useState("");
+  const [editDate, setEditDate]         = useState("");
+  const [editCategory, setEditCategory] = useState("");
+  const [saving, setSaving]             = useState(false);
+
   useEffect(() => {
     setUserSettings(loadSettings());
     void fetchExpenses();
@@ -179,6 +187,48 @@ export default function ExpensesPage() {
       }
     } catch {
       alert("حدث خطأ، حاول مجدداً");
+    }
+  }
+
+  function openEdit(expense: Expense) {
+    setEditingExpense(expense);
+    setEditStore(expense.store ?? "");
+    setEditAmount(expense.amount != null ? String(expense.amount) : "");
+    setEditDate(expense.date ?? "");
+    setEditCategory(expense.category ?? "أخرى");
+    setExpandedId(null);
+  }
+
+  async function handleSaveEdit() {
+    if (!editingExpense) return;
+    setSaving(true);
+    try {
+      const headers = { ...(await getAuthHeader()), "Content-Type": "application/json" };
+      const res = await fetch(apiUrl("/api/update"), {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          id:       editingExpense.id,
+          store:    editStore.trim() || null,
+          amount:   parseFloat(editAmount) || 0,
+          date:     editDate || null,
+          category: editCategory,
+        }),
+      });
+      if (res.ok) {
+        setExpenses((prev) => prev.map((e) =>
+          e.id === editingExpense.id
+            ? { ...e, store: editStore.trim() || null, amount: parseFloat(editAmount) || 0, date: editDate || null, category: editCategory }
+            : e
+        ));
+        setEditingExpense(null);
+      } else {
+        alert("فشل الحفظ، حاول مجدداً");
+      }
+    } catch {
+      alert("حدث خطأ، حاول مجدداً");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -570,17 +620,23 @@ export default function ExpensesPage() {
                               <span>{formatDate(expense.date)}</span>
                             </div>
 
-                            {/* زر الحذف */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void handleDeleteSingle(expense.id);
-                              }}
-                              className="w-full rounded-xl border border-red-200 py-2 text-sm font-bold text-red-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                            >
-                              🗑 حذف هذا المصروف
-                            </button>
+                            {/* أزرار التعديل والحذف */}
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); openEdit(expense); }}
+                                className="flex-1 rounded-xl border border-[#1D9E75]/30 py-2 text-sm font-bold text-[#1D9E75] transition-colors hover:bg-[#1D9E75]/5"
+                              >
+                                ✏️ تعديل
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); void handleDeleteSingle(expense.id); }}
+                                className="flex-1 rounded-xl border border-red-200 py-2 text-sm font-bold text-red-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                              >
+                                🗑 حذف
+                              </button>
+                            </div>
                           </div>
                         )}
                       </article>
@@ -593,6 +649,102 @@ export default function ExpensesPage() {
         </div>
       </main>
       <BottomNav />
+
+      {/* ── Modal التعديل ── */}
+      {editingExpense && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          {/* خلفية معتمة */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setEditingExpense(null)}
+          />
+
+          {/* البطاقة */}
+          <div className="relative w-full max-w-xl rounded-t-3xl bg-white px-5 pb-10 pt-5 shadow-2xl">
+            {/* مقبض */}
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-200" />
+
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-extrabold text-gray-800">تعديل الفاتورة</h2>
+              <button
+                onClick={() => setEditingExpense(null)}
+                className="rounded-full bg-gray-100 p-2 text-gray-400 hover:bg-gray-200"
+              >✕</button>
+            </div>
+
+            <div className="space-y-4">
+              {/* اسم المحل */}
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-gray-500">🏪 اسم المحل</label>
+                <input
+                  type="text"
+                  value={editStore}
+                  onChange={e => setEditStore(e.target.value)}
+                  placeholder="مثال: ستاربكس"
+                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-800 outline-none focus:border-[#1D9E75] focus:ring-1 focus:ring-[#1D9E75]"
+                />
+              </div>
+
+              {/* المبلغ */}
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-gray-500">💰 المبلغ (ر.س)</label>
+                <input
+                  type="number"
+                  value={editAmount}
+                  onChange={e => setEditAmount(e.target.value)}
+                  placeholder="0.00"
+                  min={0}
+                  step={0.01}
+                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-800 outline-none focus:border-[#1D9E75] focus:ring-1 focus:ring-[#1D9E75]"
+                />
+              </div>
+
+              {/* التاريخ */}
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-gray-500">📅 التاريخ</label>
+                <input
+                  type="date"
+                  value={editDate}
+                  onChange={e => setEditDate(e.target.value)}
+                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-800 outline-none focus:border-[#1D9E75] focus:ring-1 focus:ring-[#1D9E75]"
+                />
+              </div>
+
+              {/* التصنيف */}
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-gray-500">🏷️ التصنيف</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {Object.entries(CATEGORY_ICONS).map(([cat, icon]) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setEditCategory(cat)}
+                      className={`flex flex-col items-center gap-1 rounded-2xl py-2.5 text-xs font-semibold transition-all ${
+                        editCategory === cat
+                          ? "bg-[#1D9E75] text-white"
+                          : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                      }`}
+                    >
+                      <span className="text-lg">{icon}</span>
+                      <span className="truncate w-full text-center">{cat}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* زر الحفظ */}
+              <button
+                type="button"
+                onClick={() => void handleSaveEdit()}
+                disabled={saving}
+                className="w-full rounded-2xl bg-[#1D9E75] py-4 text-base font-bold text-white shadow-lg transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {saving ? "جاري الحفظ..." : "💾 حفظ التعديلات"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AuthGuard>
   );
 }
