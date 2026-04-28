@@ -382,7 +382,7 @@ export default function ExpensesPage() {
                     />
                   </div>
                   <p className="text-xs text-gray-400 text-left">
-                    {Math.min((currentMonthTotal / settings.budget) * 100, 100).toFixed(0)}% من الميزانية
+                    {Math.min((currentMonthTotal / userSettings.budget) * 100, 100).toFixed(0)}% من الميزانية
                   </p>
                 </div>
               )}
