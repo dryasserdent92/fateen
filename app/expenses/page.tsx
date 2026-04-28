@@ -807,7 +807,7 @@ export default function ExpensesPage() {
                           value={item.name}
                           onChange={e => updateItem(idx, "name", e.target.value)}
                           placeholder="اسم الصنف"
-                          className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#1D9E75]"
+                          className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-[#1D9E75]"
                         />
                         <button
                           type="button"
@@ -822,7 +822,7 @@ export default function ExpensesPage() {
                         value={item.brand}
                         onChange={e => updateItem(idx, "brand", e.target.value)}
                         placeholder="الماركة (اختياري)"
-                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#1D9E75]"
+                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-[#1D9E75]"
                       />
 
                       {/* الكمية والسعر */}
@@ -837,7 +837,7 @@ export default function ExpensesPage() {
                               updateItem(idx, "quantity", parseFloat(e.target.value) || 1);
                               setTimeout(() => recalcTotalFromItems(editItems), 10);
                             }}
-                            className="w-full rounded-xl border border-gray-200 bg-white px-2 py-2 text-center text-sm outline-none focus:border-[#1D9E75]"
+                            className="w-full rounded-xl border border-gray-200 bg-white px-2 py-2 text-center text-sm text-gray-800 outline-none focus:border-[#1D9E75]"
                           />
                         </div>
                         <div>
@@ -851,7 +851,7 @@ export default function ExpensesPage() {
                               updateItem(idx, "unit_price", parseFloat(e.target.value) || 0);
                               setTimeout(() => recalcTotalFromItems(editItems), 10);
                             }}
-                            className="w-full rounded-xl border border-gray-200 bg-white px-2 py-2 text-center text-sm outline-none focus:border-[#1D9E75]"
+                            className="w-full rounded-xl border border-gray-200 bg-white px-2 py-2 text-center text-sm text-gray-800 outline-none focus:border-[#1D9E75]"
                           />
                         </div>
                         <div>
