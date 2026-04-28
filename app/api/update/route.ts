@@ -12,6 +12,9 @@ export async function PATCH(req: NextRequest) {
     amount?: number | null;
     date?: string | null;
     category?: string | null;
+    item_name?: string | null;
+    item_brand?: string | null;
+    items?: Array<{ name: string; brand: string | null; quantity: number; unit_price: number; total_price: number }> | null;
   };
 
   if (!body.id) return NextResponse.json({ error: "id مطلوب" }, { status: 400 });
@@ -22,10 +25,13 @@ export async function PATCH(req: NextRequest) {
   );
 
   const updates: Record<string, unknown> = {};
-  if (body.store    !== undefined) updates.store    = body.store;
-  if (body.amount   !== undefined) updates.amount   = body.amount;
-  if (body.date     !== undefined) updates.date     = body.date;
-  if (body.category !== undefined) updates.category = body.category;
+  if (body.store      !== undefined) updates.store      = body.store;
+  if (body.amount     !== undefined) updates.amount     = body.amount;
+  if (body.date       !== undefined) updates.date       = body.date;
+  if (body.category   !== undefined) updates.category   = body.category;
+  if (body.item_name  !== undefined) updates.item_name  = body.item_name;
+  if (body.item_brand !== undefined) updates.item_brand = body.item_brand;
+  if (body.items      !== undefined) updates.items      = body.items;
 
   const { error } = await supabase
     .from("expenses")

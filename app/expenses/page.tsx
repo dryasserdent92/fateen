@@ -79,11 +79,13 @@ export default function ExpensesPage() {
   const [userSettings, setUserSettings] = useState({ startDay: 1, budget: 0 });
 
   /* التعديل */
+  type EditItem = { name: string; brand: string; quantity: number; unit_price: number; total_price: number };
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editStore, setEditStore]       = useState("");
   const [editAmount, setEditAmount]     = useState("");
   const [editDate, setEditDate]         = useState("");
   const [editCategory, setEditCategory] = useState("");
+  const [editItems, setEditItems]       = useState<EditItem[]>([]);
   const [saving, setSaving]             = useState(false);
 
   useEffect(() => {
@@ -196,7 +198,40 @@ export default function ExpensesPage() {
     setEditAmount(expense.amount != null ? String(expense.amount) : "");
     setEditDate(expense.date ?? "");
     setEditCategory(expense.category ?? "أخرى");
+    setEditItems(
+      Array.isArray(expense.items) && expense.items.length > 0
+        ? expense.items.map(i => ({ name: i.name, brand: i.brand ?? "", quantity: i.quantity, unit_price: i.unit_price, total_price: i.total_price }))
+        : []
+    );
     setExpandedId(null);
+  }
+
+  function addItem() {
+    setEditItems(prev => [...prev, { name: "", brand: "", quantity: 1, unit_price: 0, total_price: 0 }]);
+  }
+
+  function removeItem(idx: number) {
+    setEditItems(prev => prev.filter((_, i) => i !== idx));
+  }
+
+  function updateItem(idx: number, field: keyof EditItem, value: string | number) {
+    setEditItems(prev => prev.map((item, i) => {
+      if (i !== idx) return item;
+      const updated = { ...item, [field]: value };
+      // إعادة حساب السعر الإجمالي تلقائياً
+      if (field === "quantity" || field === "unit_price") {
+        updated.total_price = parseFloat(String(updated.quantity)) * parseFloat(String(updated.unit_price)) || 0;
+        updated.total_price = Math.round(updated.total_price * 100) / 100;
+      }
+      return updated;
+    }));
+  }
+
+  // إعادة حساب المبلغ الإجمالي من الأصناف تلقائياً
+  function recalcTotalFromItems(items: EditItem[]) {
+    if (items.length === 0) return;
+    const total = items.reduce((s, i) => s + (i.total_price || 0), 0);
+    setEditAmount(String(Math.round(total * 100) / 100));
   }
 
   async function handleSaveEdit() {
@@ -204,21 +239,31 @@ export default function ExpensesPage() {
     setSaving(true);
     try {
       const headers = { ...(await getAuthHeader()), "Content-Type": "application/json" };
+      const cleanItems = editItems.filter(i => i.name.trim()).map(i => ({
+        name: i.name.trim(),
+        brand: i.brand.trim() || null,
+        quantity: parseFloat(String(i.quantity)) || 1,
+        unit_price: parseFloat(String(i.unit_price)) || 0,
+        total_price: parseFloat(String(i.total_price)) || 0,
+      }));
       const res = await fetch(apiUrl("/api/update"), {
         method: "PATCH",
         headers,
         body: JSON.stringify({
-          id:       editingExpense.id,
-          store:    editStore.trim() || null,
-          amount:   parseFloat(editAmount) || 0,
-          date:     editDate || null,
-          category: editCategory,
+          id:         editingExpense.id,
+          store:      editStore.trim() || null,
+          amount:     parseFloat(editAmount) || 0,
+          date:       editDate || null,
+          category:   editCategory,
+          items:      cleanItems.length > 0 ? cleanItems : null,
+          item_name:  cleanItems.length === 0 ? (editingExpense.item_name ?? null) : null,
+          item_brand: cleanItems.length === 0 ? (editingExpense.item_brand ?? null) : null,
         }),
       });
       if (res.ok) {
         setExpenses((prev) => prev.map((e) =>
           e.id === editingExpense.id
-            ? { ...e, store: editStore.trim() || null, amount: parseFloat(editAmount) || 0, date: editDate || null, category: editCategory }
+            ? { ...e, store: editStore.trim() || null, amount: parseFloat(editAmount) || 0, date: editDate || null, category: editCategory, items: cleanItems.length > 0 ? cleanItems : null }
             : e
         ));
         setEditingExpense(null);
@@ -730,6 +775,108 @@ export default function ExpensesPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* الأصناف */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-gray-500">🛒 الأصناف</label>
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    className="rounded-xl bg-[#1D9E75]/10 px-3 py-1 text-xs font-bold text-[#1D9E75] hover:bg-[#1D9E75]/20"
+                  >+ أضف صنف</button>
+                </div>
+
+                {editItems.length === 0 && (
+                  <p className="rounded-2xl bg-gray-50 py-3 text-center text-xs text-gray-400">
+                    لا توجد أصناف — اضغط &quot;+ أضف صنف&quot; لإضافتها
+                  </p>
+                )}
+
+                <div className="space-y-3">
+                  {editItems.map((item, idx) => (
+                    <div key={idx} className="rounded-2xl border border-gray-100 bg-gray-50 p-3 space-y-2">
+                      {/* اسم الصنف */}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={item.name}
+                          onChange={e => updateItem(idx, "name", e.target.value)}
+                          placeholder="اسم الصنف"
+                          className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#1D9E75]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeItem(idx)}
+                          className="rounded-xl bg-red-50 px-2 py-2 text-red-400 hover:bg-red-100"
+                        >✕</button>
+                      </div>
+
+                      {/* الماركة */}
+                      <input
+                        type="text"
+                        value={item.brand}
+                        onChange={e => updateItem(idx, "brand", e.target.value)}
+                        placeholder="الماركة (اختياري)"
+                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#1D9E75]"
+                      />
+
+                      {/* الكمية والسعر */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <p className="mb-1 text-xs text-gray-400">الكمية</p>
+                          <input
+                            type="number"
+                            value={item.quantity}
+                            min={1}
+                            onChange={e => {
+                              updateItem(idx, "quantity", parseFloat(e.target.value) || 1);
+                              setTimeout(() => recalcTotalFromItems(editItems), 10);
+                            }}
+                            className="w-full rounded-xl border border-gray-200 bg-white px-2 py-2 text-center text-sm outline-none focus:border-[#1D9E75]"
+                          />
+                        </div>
+                        <div>
+                          <p className="mb-1 text-xs text-gray-400">سعر الوحدة</p>
+                          <input
+                            type="number"
+                            value={item.unit_price}
+                            min={0}
+                            step={0.01}
+                            onChange={e => {
+                              updateItem(idx, "unit_price", parseFloat(e.target.value) || 0);
+                              setTimeout(() => recalcTotalFromItems(editItems), 10);
+                            }}
+                            className="w-full rounded-xl border border-gray-200 bg-white px-2 py-2 text-center text-sm outline-none focus:border-[#1D9E75]"
+                          />
+                        </div>
+                        <div>
+                          <p className="mb-1 text-xs text-gray-400">الإجمالي</p>
+                          <input
+                            type="number"
+                            value={item.total_price}
+                            min={0}
+                            step={0.01}
+                            onChange={e => updateItem(idx, "total_price", parseFloat(e.target.value) || 0)}
+                            className="w-full rounded-xl border border-gray-200 bg-white px-2 py-2 text-center text-sm font-bold text-[#1D9E75] outline-none focus:border-[#1D9E75]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* زر إعادة حساب المجموع */}
+                {editItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => recalcTotalFromItems(editItems)}
+                    className="mt-2 w-full rounded-xl bg-[#1D9E75]/8 py-2 text-xs font-semibold text-[#1D9E75] hover:bg-[#1D9E75]/15"
+                  >
+                    🔄 إعادة حساب المجموع من الأصناف
+                  </button>
+                )}
               </div>
 
               {/* زر الحفظ */}
