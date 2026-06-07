@@ -82,6 +82,11 @@ export default function ExpensesPage() {
   const [deleting, setDeleting] = useState(false);
   const [userSettings, setUserSettings] = useState({ startDay: 1, budget: 0 });
 
+  /* فلتر الشهر — يبدأ بالشهر الحالي */
+  const [selectedMonthKey, setSelectedMonthKey] = useState<string>(() =>
+    new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }).slice(0, 7)
+  );
+
   /* التعديل */
   type EditItem = { name: string; brand: string; quantity: number; unit_price: number; total_price: number };
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -125,11 +130,6 @@ export default function ExpensesPage() {
     }
     setLoading(false);
   }
-
-  /* المصاريف المعروضة بعد الفلتر */
-  const visibleExpenses = filterCategory
-    ? expenses.filter((e) => (e.category ?? "أخرى") === filterCategory)
-    : expenses;
 
   function toggleSelectMode() {
     setSelectMode((prev) => !prev);
@@ -281,21 +281,48 @@ export default function ExpensesPage() {
     }
   }
 
-  /* تاريخ اليوم بتوقيت السعودية — نص نظيف "YYYY-MM-DD" */
+  /* تاريخ اليوم بتوقيت السعودية */
   const todaySAStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+  const currentMonthKey = todaySAStr.slice(0, 7);
 
-  /* بداية الفترة الحالية بناءً على يوم البداية المخصص */
-  const periodStart = getPeriodStart(todaySAStr, userSettings.startDay);
+  const MONTH_NAMES = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
 
-  /* إجمالي الفترة الحالية فقط */
-  const currentMonthTotal = expenses.reduce((sum, expense) => {
-    if (!expense.date) return sum;
-    return expense.date >= periodStart ? sum + toNumber(expense.amount) : sum;
-  }, 0);
+  function getMonthKey(dateStr: string | null): string {
+    if (!dateStr) return "غير محدد";
+    return dateStr.slice(0, 7);
+  }
 
-  /* ملخص التصنيفات للفترة الحالية فقط (الإصلاح الرئيسي) */
-  const periodExpenses = expenses.filter(e => e.date && e.date >= periodStart);
-  const categoryStats = periodExpenses.reduce<Record<string, { total: number; count: number }>>((acc, expense) => {
+  function monthKeyLabel(key: string): string {
+    if (key === "غير محدد") return "غير محدد";
+    const [y, m] = key.split("-");
+    const monthIdx = parseInt(m ?? "1") - 1;
+    return `${MONTH_NAMES[monthIdx] ?? m} ${y}`;
+  }
+
+  /* كل الأشهر المتوفرة في البيانات — مرتبة من الأحدث */
+  const allMonthKeys: string[] = [
+    ...new Set(expenses.map(e => getMonthKey(e.date)).filter(k => k !== "غير محدد"))
+  ];
+  if (!allMonthKeys.includes(currentMonthKey)) allMonthKeys.push(currentMonthKey);
+  allMonthKeys.sort((a, b) => b.localeCompare(a));
+
+  const selectedIdx = allMonthKeys.indexOf(selectedMonthKey) >= 0
+    ? allMonthKeys.indexOf(selectedMonthKey)
+    : 0;
+
+  /* مصاريف الشهر المختار */
+  const selectedMonthExpenses = expenses.filter(e => getMonthKey(e.date) === selectedMonthKey);
+
+  /* المصاريف المعروضة — الشهر المختار + فلتر التصنيف */
+  const visibleExpenses = filterCategory
+    ? selectedMonthExpenses.filter((e) => (e.category ?? "أخرى") === filterCategory)
+    : selectedMonthExpenses;
+
+  /* إجمالي الشهر المختار */
+  const currentMonthTotal = selectedMonthExpenses.reduce((s, e) => s + toNumber(e.amount), 0);
+
+  /* ملخص التصنيفات للشهر المختار */
+  const categoryStats = selectedMonthExpenses.reduce<Record<string, { total: number; count: number }>>((acc, expense) => {
     const cat = expense.category ?? "أخرى";
     if (!acc[cat]) acc[cat] = { total: 0, count: 0 };
     acc[cat]!.total += toNumber(expense.amount);
@@ -310,53 +337,16 @@ export default function ExpensesPage() {
   const fuelCount = FUEL_CATS.reduce((s, cat) => s + (categoryStats[cat]?.count ?? 0), 0);
   const hasFuelBreakdown = FUEL_CATS.filter(c => categoryStats[c]?.count).length > 1;
 
-  /* المتبقي من الميزانية */
-  const remaining = userSettings.budget > 0 ? userSettings.budget - currentMonthTotal : null;
+  /* الميزانية — تظهر فقط للشهر الحالي */
+  const periodStart = getPeriodStart(todaySAStr, userSettings.startDay);
+  const periodTotal = selectedMonthKey === currentMonthKey
+    ? expenses.reduce((s, e) => (!e.date ? s : e.date >= periodStart ? s + toNumber(e.amount) : s), 0)
+    : null;
+  const remaining = userSettings.budget > 0 && periodTotal !== null
+    ? userSettings.budget - periodTotal
+    : null;
 
   const allSelected = visibleExpenses.length > 0 && selected.size === visibleExpenses.length;
-
-  /* ── تجميع المصاريف حسب الشهر ── */
-  const MONTH_NAMES = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
-
-  function getMonthKey(dateStr: string | null): string {
-    if (!dateStr) return "غير محدد";
-    return dateStr.slice(0, 7); // "YYYY-MM"
-  }
-
-  function monthKeyLabel(key: string): string {
-    if (key === "غير محدد") return "غير محدد 📌";
-    const [y, m] = key.split("-");
-    const monthIdx = parseInt(m ?? "1") - 1;
-    return `${MONTH_NAMES[monthIdx] ?? m} ${y}`;
-  }
-
-  // تجميع حسب الشهر
-  const monthGroups = visibleExpenses.reduce<Record<string, Expense[]>>((acc, e) => {
-    const key = getMonthKey(e.date);
-    if (!acc[key]) acc[key] = [];
-    acc[key]!.push(e);
-    return acc;
-  }, {});
-
-  // ترتيب الأشهر من الأحدث للأقدم
-  const sortedMonthKeys = Object.keys(monthGroups).sort((a, b) => b.localeCompare(a));
-
-  // الشهر الحالي = أول مجموعة (الأحدث)
-  const currentMonthKey = todaySAStr.slice(0, 7);
-
-  // الأشهر المطوية: افتراضياً كل شيء ما عدا الشهر الحالي
-  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(
-    () => new Set(sortedMonthKeys.filter(k => k !== currentMonthKey))
-  );
-
-  function toggleMonth(key: string) {
-    setCollapsedMonths(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
 
   return (
     <AuthGuard>
@@ -369,11 +359,45 @@ export default function ExpensesPage() {
               <h1 className="text-3xl font-extrabold text-[#1D9E75]">مصاريفي</h1>
             </div>
 
-            <div className="mt-5 rounded-2xl bg-[#1D9E75]/5 p-4 space-y-3">
+            {/* تنقل بين الأشهر */}
+            {!loading && allMonthKeys.length > 0 && (
+              <div className="mt-4 flex items-center gap-2 rounded-2xl bg-[#1D9E75]/5 px-2 py-2">
+                {/* الشهر السابق (أقدم) */}
+                <button
+                  type="button"
+                  disabled={selectedIdx >= allMonthKeys.length - 1}
+                  onClick={() => {
+                    setSelectedMonthKey(allMonthKeys[selectedIdx + 1]!);
+                    setFilterCategory(null);
+                  }}
+                  className="flex size-9 items-center justify-center rounded-xl text-[#1D9E75] font-bold disabled:opacity-25 hover:bg-[#1D9E75]/10 active:scale-95 transition-all"
+                >◀</button>
+                <div className="flex-1 text-center">
+                  <p className="text-sm font-extrabold text-[#1D9E75]">
+                    {monthKeyLabel(selectedMonthKey)}
+                  </p>
+                  {selectedMonthKey === currentMonthKey && (
+                    <p className="text-xs text-[#1D9E75]/50">الشهر الحالي</p>
+                  )}
+                </div>
+                {/* الشهر التالي (أحدث) */}
+                <button
+                  type="button"
+                  disabled={selectedIdx <= 0}
+                  onClick={() => {
+                    setSelectedMonthKey(allMonthKeys[selectedIdx - 1]!);
+                    setFilterCategory(null);
+                  }}
+                  className="flex size-9 items-center justify-center rounded-xl text-[#1D9E75] font-bold disabled:opacity-25 hover:bg-[#1D9E75]/10 active:scale-95 transition-all"
+                >▶</button>
+              </div>
+            )}
+
+            <div className="mt-3 rounded-2xl bg-[#1D9E75]/5 p-4 space-y-3">
               <div>
                 <p className="text-xs font-medium text-gray-500">
-                  إجمالي الفترة الحالية
-                  {userSettings.startDay !== 1 && (
+                  {selectedMonthKey === currentMonthKey ? "إجمالي الفترة الحالية" : `إجمالي ${monthKeyLabel(selectedMonthKey)}`}
+                  {selectedMonthKey === currentMonthKey && userSettings.startDay !== 1 && (
                     <span className="mr-1 text-gray-400">(منذ {userSettings.startDay} الشهر)</span>
                   )}
                 </p>
@@ -593,37 +617,8 @@ export default function ExpensesPage() {
                 </p>
               </div>
             ) : (
-              sortedMonthKeys.map((monthKey) => {
-                const monthExpenses = monthGroups[monthKey] ?? [];
-                const isCollapsed = collapsedMonths.has(monthKey);
-                const monthTotal = monthExpenses.reduce((s, e) => s + toNumber(e.amount), 0);
-                const isCurrent = monthKey === currentMonthKey;
-
-                return (
-                <div key={monthKey} className="space-y-2">
-                  {/* رأس الشهر — قابل للطي */}
-                  <button
-                    type="button"
-                    onClick={() => toggleMonth(monthKey)}
-                    className="w-full flex items-center gap-2 px-1 py-1 text-right"
-                  >
-                    <span className="text-base">{isCollapsed ? "📁" : "📂"}</span>
-                    <span className="flex-1 text-sm font-bold text-white">
-                      {monthKeyLabel(monthKey)}
-                      {isCurrent && <span className="mr-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-normal">الحالي</span>}
-                    </span>
-                    <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold text-white">
-                      {monthExpenses.length} مصروف
-                    </span>
-                    <span className="text-xs font-bold text-white/80">
-                      {monthTotal.toFixed(0)} ر.س
-                    </span>
-                    <span className="text-white/60 text-sm">{isCollapsed ? "▶" : "▼"}</span>
-                  </button>
-
-                  {/* بطاقات الشهر */}
-                  {!isCollapsed && <div className="space-y-3">
-                  {monthExpenses.map((expense) => {
+              <div className="space-y-3">
+              {visibleExpenses.map((expense) => {
                     const isSelected = selected.has(expense.id);
                     const isExpanded = expandedId === expense.id;
                     const hasItems   = Array.isArray(expense.items) && expense.items.length > 0;
@@ -750,11 +745,8 @@ export default function ExpensesPage() {
                         )}
                       </article>
                     );
-                  })}
-                  </div>}
-                </div>
-                );
-              })
+              })}
+              </div>
             )}
           </section>
         </div>
