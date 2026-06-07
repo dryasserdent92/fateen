@@ -6,7 +6,7 @@ import AuthGuard from "../components/auth-guard";
 import { supabase } from "../../lib/supabase";
 import { apiUrl } from "../../lib/api-client";
 
-const CATEGORIES = ["مطاعم", "قهوة", "بنزيني", "بنزين السواق", "بنزين عام", "سوبرماركت", "تسوق", "صحة", "فواتير", "رواتب", "أخرى"] as const;
+const CATEGORIES = ["مطاعم", "قهوة", "بنزيني", "بنزين السواق", "بنزين عام", "سيارة", "سوبرماركت", "تسوق", "صحة", "فواتير", "رواتب", "أخرى"] as const;
 type Category = (typeof CATEGORIES)[number];
 type InputMethod = "image" | "sms" | "voice";
 type Step = "input" | "review" | "saved";
