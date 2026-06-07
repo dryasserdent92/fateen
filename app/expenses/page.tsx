@@ -305,38 +305,48 @@ export default function ExpensesPage() {
 
   const allSelected = visibleExpenses.length > 0 && selected.size === visibleExpenses.length;
 
-  /* ── تقسيم المصاريف لمجموعات زمنية ── */
-  function getWeekGroup(dateStr: string | null): "هذا الأسبوع" | "الأسبوع الماضي" | "أقدم" {
-    if (!dateStr) return "أقدم";
-    /* فرق الأيام بمقارنة الطوابع الزمنية بتوقيت السعودية */
-    const todayMs   = new Date(`${todaySAStr}T12:00:00+03:00`).getTime();
-    const expenseMs = new Date(`${dateStr}T12:00:00+03:00`).getTime();
-    const daysAgo   = Math.round((todayMs - expenseMs) / 86_400_000);
+  /* ── تجميع المصاريف حسب الشهر ── */
+  const MONTH_NAMES = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
 
-    /* يوم الأسبوع الحالي بتوقيت السعودية (0=أحد … 6=سبت) */
-    const dowLabel = new Date(`${todaySAStr}T12:00:00+03:00`)
-      .toLocaleDateString("en-US", { weekday: "short", timeZone: "Asia/Riyadh" });
-    const dow = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(dowLabel); // 0-6
-
-    if (daysAgo <= dow)        return "هذا الأسبوع";   /* من الأحد حتى اليوم */
-    if (daysAgo <= dow + 7)    return "الأسبوع الماضي";
-    return "أقدم";
+  function getMonthKey(dateStr: string | null): string {
+    if (!dateStr) return "غير محدد";
+    return dateStr.slice(0, 7); // "YYYY-MM"
   }
 
-  type GroupKey = "هذا الأسبوع" | "الأسبوع الماضي" | "أقدم";
-  const GROUP_ORDER: GroupKey[] = ["هذا الأسبوع", "الأسبوع الماضي", "أقدم"];
-  const GROUP_ICONS: Record<GroupKey, string> = {
-    "هذا الأسبوع":    "🗓",
-    "الأسبوع الماضي": "📅",
-    "أقدم":           "🗃",
-  };
+  function monthKeyLabel(key: string): string {
+    if (key === "غير محدد") return "غير محدد 📌";
+    const [y, m] = key.split("-");
+    const monthIdx = parseInt(m ?? "1") - 1;
+    return `${MONTH_NAMES[monthIdx] ?? m} ${y}`;
+  }
 
-  const groupedExpenses = visibleExpenses.reduce<Record<GroupKey, Expense[]>>((acc, e) => {
-    const g = getWeekGroup(e.date);
-    if (!acc[g]) acc[g] = [];
-    acc[g]!.push(e);
+  // تجميع حسب الشهر
+  const monthGroups = visibleExpenses.reduce<Record<string, Expense[]>>((acc, e) => {
+    const key = getMonthKey(e.date);
+    if (!acc[key]) acc[key] = [];
+    acc[key]!.push(e);
     return acc;
-  }, {} as Record<GroupKey, Expense[]>);
+  }, {});
+
+  // ترتيب الأشهر من الأحدث للأقدم
+  const sortedMonthKeys = Object.keys(monthGroups).sort((a, b) => b.localeCompare(a));
+
+  // الشهر الحالي = أول مجموعة (الأحدث)
+  const currentMonthKey = todaySAStr.slice(0, 7);
+
+  // الأشهر المطوية: افتراضياً كل شيء ما عدا الشهر الحالي
+  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(
+    () => new Set(sortedMonthKeys.filter(k => k !== currentMonthKey))
+  );
+
+  function toggleMonth(key: string) {
+    setCollapsedMonths(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   return (
     <AuthGuard>
@@ -547,19 +557,37 @@ export default function ExpensesPage() {
                 </p>
               </div>
             ) : (
-              GROUP_ORDER.filter((g) => (groupedExpenses[g] ?? []).length > 0).map((group) => (
-                <div key={group} className="space-y-3">
-                  {/* رأس المجموعة */}
-                  <div className="flex items-center gap-2 px-1">
-                    <span className="text-base">{GROUP_ICONS[group]}</span>
-                    <span className="text-sm font-bold text-white">{group}</span>
-                    <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold text-white">
-                      {(groupedExpenses[group] ?? []).length}
-                    </span>
-                  </div>
+              sortedMonthKeys.map((monthKey) => {
+                const monthExpenses = monthGroups[monthKey] ?? [];
+                const isCollapsed = collapsedMonths.has(monthKey);
+                const monthTotal = monthExpenses.reduce((s, e) => s + toNumber(e.amount), 0);
+                const isCurrent = monthKey === currentMonthKey;
 
-                  {/* بطاقات المجموعة */}
-                  {(groupedExpenses[group] ?? []).map((expense) => {
+                return (
+                <div key={monthKey} className="space-y-2">
+                  {/* رأس الشهر — قابل للطي */}
+                  <button
+                    type="button"
+                    onClick={() => toggleMonth(monthKey)}
+                    className="w-full flex items-center gap-2 px-1 py-1 text-right"
+                  >
+                    <span className="text-base">{isCollapsed ? "📁" : "📂"}</span>
+                    <span className="flex-1 text-sm font-bold text-white">
+                      {monthKeyLabel(monthKey)}
+                      {isCurrent && <span className="mr-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-normal">الحالي</span>}
+                    </span>
+                    <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold text-white">
+                      {monthExpenses.length} مصروف
+                    </span>
+                    <span className="text-xs font-bold text-white/80">
+                      {monthTotal.toFixed(0)} ر.س
+                    </span>
+                    <span className="text-white/60 text-sm">{isCollapsed ? "▶" : "▼"}</span>
+                  </button>
+
+                  {/* بطاقات الشهر */}
+                  {!isCollapsed && <div className="space-y-3">
+                  {monthExpenses.map((expense) => {
                     const isSelected = selected.has(expense.id);
                     const isExpanded = expandedId === expense.id;
                     const hasItems   = Array.isArray(expense.items) && expense.items.length > 0;
@@ -687,8 +715,10 @@ export default function ExpensesPage() {
                       </article>
                     );
                   })}
+                  </div>}
                 </div>
-              ))
+                );
+              })
             )}
           </section>
         </div>
