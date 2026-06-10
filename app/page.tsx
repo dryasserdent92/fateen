@@ -232,14 +232,23 @@ export default function Home() {
             )}
           </div>
 
-          {/* زر إضافة سريعة */}
-          <Link
-            href="/add"
-            className="flex w-full items-center justify-center gap-2 rounded-3xl bg-white py-4 text-lg font-bold text-[#1D9E75] shadow-lg transition-opacity hover:opacity-90 active:scale-[0.98]"
-          >
-            <span className="text-xl">📸</span>
-            أضف مصروف جديد
-          </Link>
+          {/* أزرار سريعة */}
+          <div className="grid grid-cols-2 gap-3">
+            <Link
+              href="/add"
+              className="flex items-center justify-center gap-2 rounded-3xl bg-white py-4 text-base font-bold text-[#1D9E75] shadow-lg transition-opacity hover:opacity-90 active:scale-[0.98]"
+            >
+              <span className="text-xl">📸</span>
+              أضف مصروف
+            </Link>
+            <Link
+              href="/reports"
+              className="flex items-center justify-center gap-2 rounded-3xl bg-white/20 py-4 text-base font-bold text-white shadow-lg transition-opacity hover:opacity-90 active:scale-[0.98]"
+            >
+              <span className="text-xl">📊</span>
+              التقارير
+            </Link>
+          </div>
 
           {/* آخر المصاريف */}
           {!loading && recentExpenses.length > 0 && (
