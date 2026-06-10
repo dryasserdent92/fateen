@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "../../lib/supabase";
 import { apiUrl } from "../../lib/api-client";
 import AuthGuard from "../components/auth-guard";
@@ -31,24 +31,17 @@ type Purchase = {
   date: string | null;
 };
 
-/** صنف فيه مقارنة حقيقية بين محلات بأسعار مختلفة */
 type CompareItem = {
   name: string;
-  storeStats: {
-    store: string;
-    avgPrice: number;
-    minPrice: number;
-    count: number;
-  }[];
+  storeStats: { store: string; avgPrice: number; minPrice: number; count: number }[];
   cheapestStore: string;
   mostExpensiveStore: string;
-  priceDiff: number;          // الفرق بين الأرخص والأغلى
+  priceDiff: number;
   totalSpent: number;
   potentialSavings: number;
   allPurchases: Purchase[];
 };
 
-/** صنف متكرر بدون مقارنة (نفس المحل أو نفس السعر) */
 type HabitItem = {
   name: string;
   count: number;
@@ -62,6 +55,29 @@ type AnalysisResult = {
   compareItems: CompareItem[];
   habitItems: HabitItem[];
   totalSavings: number;
+};
+
+/* صنف قابل للاختيار في أداة المقارنة */
+type SelectableItem = {
+  uid: string;
+  name: string;
+  brand: string | null;
+  unit_price: number;
+  quantity: number;
+  store: string | null;
+  date: string | null;
+};
+
+type CompareResult = {
+  comparable: boolean;
+  item1_unit_count: number | null;
+  item2_unit_count: number | null;
+  item1_price_per_unit: number | null;
+  item2_price_per_unit: number | null;
+  winner: 1 | 2 | null;
+  savings_percent: number | null;
+  unit_label: string | null;
+  message: string;
 };
 
 /* ──────────────── مساعدات ──────────────── */
@@ -85,18 +101,10 @@ function formatDateShort(dateStr: string | null): string {
   });
 }
 
-/**
- * التحليل الرئيسي:
- * 1. جمع كل الأصناف
- * 2. إزالة التكرار: نفس اليوم + نفس السعر = إدخال واحد فقط
- * 3. تقسيم الأصناف:
- *    - CompareItem: محلات مختلفة + أسعار مختلفة (فرق > 0.5 ريال)
- *    - HabitItem: متكرر لكن بدون فرق حقيقي
- */
+/* ── تحليل الأصناف المتكررة ── */
 function analyzeExpenses(expenses: ExpenseRow[]): AnalysisResult {
   const map = new Map<string, { displayName: string; purchases: Purchase[] }>();
 
-  /* ── جمع كل الأصناف ── */
   for (const exp of expenses) {
     if (!Array.isArray(exp.items) || exp.items.length === 0) continue;
     for (const item of exp.items) {
@@ -118,104 +126,126 @@ function analyzeExpenses(expenses: ExpenseRow[]): AnalysisResult {
   for (const [, { displayName, purchases }] of map) {
     if (purchases.length < 2) continue;
 
-    /* ── إزالة التكرار: نفس التاريخ + نفس السعر ── */
+    /* إزالة التكرار: نفس التاريخ + نفس السعر */
     const seen = new Set<string>();
     const deduped: Purchase[] = [];
     for (const p of purchases) {
-      const dedupKey = `${p.date ?? ""}__${p.unit_price.toFixed(2)}`;
-      if (!seen.has(dedupKey)) {
-        seen.add(dedupKey);
-        deduped.push(p);
-      }
+      const dk = `${p.date ?? ""}__${p.unit_price.toFixed(2)}`;
+      if (!seen.has(dk)) { seen.add(dk); deduped.push(p); }
     }
     if (deduped.length < 2) continue;
 
-    /* ── حساب متاجر فريدة وأسعار فريدة ── */
     const uniqueStores = new Set(deduped.map(p => p.store ?? "").filter(Boolean));
     const uniquePrices = new Set(deduped.map(p => Math.round(p.unit_price * 100)));
-    const hasMultipleStores = uniqueStores.size >= 2;
-    const hasMultiplePrices = uniquePrices.size >= 2;
-
     const prices = deduped.map(p => p.unit_price).filter(p => p > 0);
     const minPrice = prices.length ? Math.min(...prices) : 0;
     const maxPrice = prices.length ? Math.max(...prices) : 0;
     const priceDiff = maxPrice - minPrice;
     const totalSpent = deduped.reduce((s, p) => s + p.unit_price * p.quantity, 0);
     const avgPrice = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
-    const lastDate = deduped.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))[0]?.date ?? null;
+    const lastDate = [...deduped].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))[0]?.date ?? null;
 
-    /* ── شرط المقارنة الحقيقية: محلات مختلفة + فرق سعر > 0.5 ريال ── */
-    if (hasMultipleStores && hasMultiplePrices && priceDiff > 0.5) {
-      /* احسب متوسط السعر لكل محل */
+    if (uniqueStores.size >= 2 && uniquePrices.size >= 2 && priceDiff > 0.5) {
       const storeMap = new Map<string, number[]>();
       for (const p of deduped) {
         if (!p.store || p.unit_price <= 0) continue;
         if (!storeMap.has(p.store)) storeMap.set(p.store, []);
         storeMap.get(p.store)!.push(p.unit_price);
       }
-
-      const storeStats = Array.from(storeMap.entries()).map(([store, storePrices]) => ({
-        store,
-        avgPrice: storePrices.reduce((a, b) => a + b, 0) / storePrices.length,
-        minPrice: Math.min(...storePrices),
-        count: storePrices.length,
+      const storeStats = Array.from(storeMap.entries()).map(([store, sp]) => ({
+        store, avgPrice: sp.reduce((a, b) => a + b, 0) / sp.length,
+        minPrice: Math.min(...sp), count: sp.length,
       })).sort((a, b) => a.avgPrice - b.avgPrice);
 
-      if (storeStats.length < 2) {
-        // لو بعد الحساب محل واحد فقط، روّح لـ habit
-        habitItems.push({ name: displayName, count: deduped.length, avgPrice, totalSpent, stores: Array.from(uniqueStores), lastDate });
+      if (storeStats.length >= 2) {
+        const cheapestAvg = storeStats[0]!.avgPrice;
+        const potentialSavings = Math.max(0, deduped.reduce((s, p) => s + (p.unit_price - cheapestAvg) * p.quantity, 0));
+        compareItems.push({
+          name: displayName, storeStats,
+          cheapestStore: storeStats[0]!.store,
+          mostExpensiveStore: storeStats[storeStats.length - 1]!.store,
+          priceDiff, totalSpent, potentialSavings, allPurchases: deduped,
+        });
         continue;
       }
+    }
+    habitItems.push({ name: displayName, count: deduped.length, avgPrice, totalSpent, stores: Array.from(uniqueStores), lastDate });
+  }
 
-      const cheapestStore = storeStats[0]!.store;
-      const mostExpensiveStore = storeStats[storeStats.length - 1]!.store;
-      const cheapestAvg = storeStats[0]!.avgPrice;
-      const potentialSavings = deduped.reduce((s, p) => {
-        if (p.unit_price > 0) return s + (p.unit_price - cheapestAvg) * p.quantity;
-        return s;
-      }, 0);
+  compareItems.sort((a, b) => b.potentialSavings - a.potentialSavings || b.priceDiff - a.priceDiff);
+  habitItems.sort((a, b) => b.count - a.count);
+  return { compareItems, habitItems, totalSavings: compareItems.reduce((s, i) => s + i.potentialSavings, 0) };
+}
 
-      compareItems.push({
-        name: displayName,
-        storeStats,
-        cheapestStore,
-        mostExpensiveStore,
-        priceDiff,
-        totalSpent,
-        potentialSavings: Math.max(0, potentialSavings),
-        allPurchases: deduped,
-      });
-    } else {
-      /* عادة شرائية بدون مقارنة */
-      habitItems.push({
-        name: displayName,
-        count: deduped.length,
-        avgPrice,
-        totalSpent,
-        stores: Array.from(uniqueStores),
-        lastDate,
-      });
+/* ── جمع كل الأصناف القابلة للاختيار ── */
+function buildSelectableItems(expenses: ExpenseRow[]): SelectableItem[] {
+  const items: SelectableItem[] = [];
+  const seen = new Set<string>();
+
+  for (const exp of expenses) {
+    /* أصناف من items array */
+    if (Array.isArray(exp.items) && exp.items.length > 0) {
+      for (const item of exp.items) {
+        if (!item.name?.trim() || item.unit_price <= 0) continue;
+        const key = `${normalizeName(item.name)}__${item.unit_price.toFixed(2)}__${exp.store ?? ""}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        items.push({
+          uid: `${exp.id}-${normalizeName(item.name)}`,
+          name: item.name.trim(),
+          brand: item.brand,
+          unit_price: toNumber(item.unit_price),
+          quantity: Math.max(1, toNumber(item.quantity)),
+          store: exp.store?.trim() || null,
+          date: exp.date,
+        });
+      }
+    }
+    /* صنف واحد من item_name */
+    else if (exp.item_name?.trim() && toNumber(exp.amount) > 0) {
+      const key = `${normalizeName(exp.item_name)}__${toNumber(exp.amount).toFixed(2)}__${exp.store ?? ""}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        items.push({
+          uid: `${exp.id}-single`,
+          name: exp.item_name.trim(),
+          brand: null,
+          unit_price: toNumber(exp.amount),
+          quantity: 1,
+          store: exp.store?.trim() || null,
+          date: exp.date,
+        });
+      }
     }
   }
 
-  /* ترتيب: الأعلى توفيراً أولاً */
-  compareItems.sort((a, b) => b.potentialSavings - a.potentialSavings || b.priceDiff - a.priceDiff);
-  habitItems.sort((a, b) => b.count - a.count);
-
-  const totalSavings = compareItems.reduce((s, i) => s + i.potentialSavings, 0);
-  return { compareItems, habitItems, totalSavings };
+  return items.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
 }
 
 /* ──────────────── المكوّن الرئيسي ──────────────── */
 export default function SmartPage() {
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisResult>({ compareItems: [], habitItems: [], totalSavings: 0 });
+  const [selectableItems, setSelectableItems] = useState<SelectableItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"analysis" | "compare">("analysis");
+
+  /* تاب التحليل */
   const [advice, setAdvice] = useState<string | null>(null);
   const [loadingAdvice, setLoadingAdvice] = useState(false);
   const [adviceError, setAdviceError] = useState<string | null>(null);
   const [expandedCompare, setExpandedCompare] = useState<string | null>(null);
   const [showAllHabits, setShowAllHabits] = useState(false);
+
+  /* تاب المقارنة */
+  const [slot1, setSlot1] = useState<SelectableItem | null>(null);
+  const [slot2, setSlot2] = useState<SelectableItem | null>(null);
+  const [search1, setSearch1] = useState("");
+  const [search2, setSearch2] = useState("");
+  const [activeSlot, setActiveSlot] = useState<1 | 2 | null>(null);
+  const [compareResult, setCompareResult] = useState<CompareResult | null>(null);
+  const [loadingCompare, setLoadingCompare] = useState(false);
+  const [compareError, setCompareError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -231,6 +261,7 @@ export default function SmartPage() {
     const rows = (data ?? []) as ExpenseRow[];
     setExpenses(rows);
     setAnalysis(analyzeExpenses(rows));
+    setSelectableItems(buildSelectableItems(rows));
     setLoading(false);
   }, []);
 
@@ -239,46 +270,58 @@ export default function SmartPage() {
   const { compareItems, habitItems, totalSavings } = analysis;
   const itemsWithItems = expenses.filter(e => Array.isArray(e.items) && e.items!.length > 0).length;
 
-  /* طلب نصيحة عمار */
+  /* نصيحة عمار */
   async function askAmmar() {
-    if (loadingAdvice) return;
-    setLoadingAdvice(true);
-    setAdviceError(null);
-    setAdvice(null);
+    if (loadingAdvice || compareItems.length === 0) return;
+    setLoadingAdvice(true); setAdviceError(null); setAdvice(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-      };
-      const payload = compareItems.slice(0, 8).map(item => ({
-        name: item.name,
-        storeStats: item.storeStats,
-        cheapestStore: item.cheapestStore,
-        priceDiff: item.priceDiff,
-        potentialSavings: item.potentialSavings,
-        count: item.allPurchases.length,
-        totalSpent: item.totalSpent,
-      }));
-      const res = await fetch(apiUrl("/api/advice"), {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ items: payload }),
-      });
-      if (!res.ok) {
-        const err = (await res.json()) as { error?: string };
-        throw new Error(err.error ?? "فشل الطلب");
-      }
+      const headers: Record<string, string> = { "Content-Type": "application/json",
+        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) };
+      const payload = compareItems.slice(0, 8).map(({ allPurchases: _p, ...r }) => r);
+      const res = await fetch(apiUrl("/api/advice"), { method: "POST", headers, body: JSON.stringify({ items: payload }) });
+      if (!res.ok) { const e = (await res.json()) as { error?: string }; throw new Error(e.error ?? "خطأ"); }
       const json = (await res.json()) as { advice?: string };
       setAdvice(json.advice ?? "ما رد عمار، جرب ثانياً.");
-    } catch (e) {
-      setAdviceError(e instanceof Error ? e.message : "فشل الاتصال");
-    } finally {
-      setLoadingAdvice(false);
-    }
+    } catch (e) { setAdviceError(e instanceof Error ? e.message : "فشل الاتصال"); }
+    finally { setLoadingAdvice(false); }
   }
 
-  /* ── Skeleton ── */
+  /* مقارنة الصنفين */
+  async function runCompare() {
+    if (!slot1 || !slot2 || loadingCompare) return;
+    setLoadingCompare(true); setCompareError(null); setCompareResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { "Content-Type": "application/json",
+        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) };
+      const res = await fetch(apiUrl("/api/compare"), {
+        method: "POST", headers,
+        body: JSON.stringify({ item1: slot1, item2: slot2 }),
+      });
+      if (!res.ok) { const e = (await res.json()) as { error?: string }; throw new Error(e.error ?? "خطأ"); }
+      const json = (await res.json()) as CompareResult;
+      setCompareResult(json);
+    } catch (e) { setCompareError(e instanceof Error ? e.message : "فشل الاتصال"); }
+    finally { setLoadingCompare(false); }
+  }
+
+  /* فلترة البحث */
+  const filtered1 = search1.trim().length > 0
+    ? selectableItems.filter(i => i.name.includes(search1.trim()) || (i.store ?? "").includes(search1.trim()))
+    : [];
+  const filtered2 = search2.trim().length > 0
+    ? selectableItems.filter(i => i.name.includes(search2.trim()) || (i.store ?? "").includes(search2.trim()))
+    : [];
+
+  function selectForSlot(item: SelectableItem, slot: 1 | 2) {
+    if (slot === 1) { setSlot1(item); setSearch1(""); setActiveSlot(null); }
+    else { setSlot2(item); setSearch2(""); setActiveSlot(null); }
+    setCompareResult(null);
+    setCompareError(null);
+  }
+
+  /* Skeleton */
   if (loading) {
     return (
       <AuthGuard>
@@ -293,142 +336,208 @@ export default function SmartPage() {
     );
   }
 
-  /* ── لا توجد بيانات كافية ── */
-  if (compareItems.length === 0 && habitItems.length === 0) {
-    return (
-      <AuthGuard>
-        <main className="min-h-screen bg-[#0F172A] pb-28 font-sans">
-          <SmartHeader />
-          <div className="px-4 pt-6 mx-auto max-w-xl">
-            <div className="rounded-3xl bg-white/10 p-8 text-center space-y-3">
-              <div className="text-5xl">🔍</div>
-              <p className="text-lg font-bold text-white">
-                {itemsWithItems === 0 ? "ما فيه أصناف بعد" : "ما فيه أصناف متكررة بعد"}
-              </p>
-              <p className="text-sm text-white/60">
-                {itemsWithItems === 0
-                  ? "لمّا تضيف مصاريف بتفاصيل الأصناف، راح يحللها عمار ويوريك فرص التوفير"
-                  : "كل صنف اشتريته مرة واحدة فقط حتى الآن"}
-              </p>
-              {itemsWithItems === 0 && (
-                <p className="text-xs text-white/40">📸 ارفع صورة الفاتورة وخلّ الذكاء الاصطناعي يستخرج الأصناف</p>
-              )}
-            </div>
-          </div>
-        </main>
-        <BottomNav />
-      </AuthGuard>
-    );
-  }
-
   const habitsToShow = showAllHabits ? habitItems : habitItems.slice(0, 4);
+  const canCompare = !!slot1 && !!slot2;
 
   return (
     <AuthGuard>
       <main className="min-h-screen bg-[#0F172A] pb-28 font-sans">
         <SmartHeader />
 
-        <div className="px-4 pt-4 space-y-5 mx-auto max-w-xl">
-
-          {/* ── بطاقة ملخص التوفير ── */}
-          {totalSavings > 0.5 && (
-            <div className="rounded-3xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 p-5">
-              <p className="text-xs font-bold text-emerald-400 mb-1">💡 فرصة التوفير المحتملة</p>
-              <p className="text-3xl font-extrabold text-emerald-300">
-                {totalSavings.toFixed(1)}
-                <span className="mr-1 text-base font-semibold text-emerald-400/70">ر.س</span>
-              </p>
-              <p className="text-xs text-white/50 mt-1">
-                لو اشتريت دايماً من المتجر الأرخص — بناءً على {compareItems.length} صنف شريته من محلات مختلفة بأسعار مختلفة
-              </p>
-            </div>
-          )}
-
-          {/* ── عمار AI — يظهر فقط لو فيه مقارنات ── */}
-          {compareItems.length > 0 && (
-            <div className="rounded-3xl bg-white/8 border border-white/10 p-5 space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="flex size-12 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-2xl shadow-lg">
-                  🧙
-                </div>
-                <div>
-                  <p className="text-sm font-extrabold text-white">عمار</p>
-                  <p className="text-xs text-white/50">مستشارك المالي الذكي</p>
-                </div>
-              </div>
-
-              {advice ? (
-                <div className="rounded-2xl bg-white/10 px-4 py-3">
-                  <p className="text-sm leading-relaxed text-white/90 whitespace-pre-line">{advice}</p>
-                </div>
-              ) : adviceError ? (
-                <div className="rounded-2xl bg-red-500/10 border border-red-500/20 px-4 py-3">
-                  <p className="text-sm text-red-300">{adviceError}</p>
-                </div>
-              ) : (
-                <p className="text-xs text-white/50">
-                  عندي {compareItems.length} صنف اشتريته من محلات بأسعار مختلفة — اضغط وعمار يوريك وين الفرصة الأفضل
-                </p>
-              )}
-
-              <button
-                type="button"
-                onClick={() => void askAmmar()}
-                disabled={loadingAdvice}
-                className="w-full rounded-2xl bg-gradient-to-r from-violet-600 to-purple-600 py-3 text-sm font-bold text-white shadow-lg shadow-purple-900/40 transition-opacity hover:opacity-90 disabled:opacity-60 active:scale-[0.98]"
-              >
-                {loadingAdvice ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                    عمار يحلل...
-                  </span>
-                ) : advice ? "🔄 طلب نصيحة جديدة" : "🔮 اطلب نصيحة عمار"}
-              </button>
-            </div>
-          )}
-
-          {/* ── مقارنة المحلات ── */}
-          {compareItems.length > 0 && (
-            <section className="space-y-2">
-              <p className="px-1 text-xs font-bold text-white/50 uppercase tracking-wider">
-                ⚖️ مقارنة المحلات ({compareItems.length})
-              </p>
-              {compareItems.map(item => (
-                <CompareCard
-                  key={item.name}
-                  item={item}
-                  expanded={expandedCompare === item.name}
-                  onToggle={() => setExpandedCompare(expandedCompare === item.name ? null : item.name)}
-                />
-              ))}
-            </section>
-          )}
-
-          {/* ── عادات الشراء ── */}
-          {habitItems.length > 0 && (
-            <section className="space-y-2">
-              <p className="px-1 text-xs font-bold text-white/50 uppercase tracking-wider">
-                🔁 عاداتك الشرائية ({habitItems.length})
-              </p>
-              <p className="px-1 text-xs text-white/30">أصناف تشتريها بانتظام — ما في فرق سعر كافٍ بين المحلات</p>
-              <div className="space-y-1.5">
-                {habitsToShow.map(item => (
-                  <HabitCard key={item.name} item={item} />
-                ))}
-              </div>
-              {habitItems.length > 4 && (
-                <button
-                  type="button"
-                  onClick={() => setShowAllHabits(v => !v)}
-                  className="w-full rounded-2xl bg-white/5 py-3 text-xs font-semibold text-white/50 hover:bg-white/10 transition-colors"
-                >
-                  {showAllHabits ? "▲ عرض أقل" : `▼ عرض الكل (${habitItems.length})`}
-                </button>
-              )}
-            </section>
-          )}
-
+        {/* ── تبويب ── */}
+        <div className="sticky top-0 z-10 bg-[#0F172A] px-4 pb-3 pt-1">
+          <div className="flex gap-2 mx-auto max-w-xl rounded-2xl bg-white/8 p-1">
+            <button
+              type="button"
+              onClick={() => setActiveTab("analysis")}
+              className={`flex-1 rounded-xl py-2.5 text-sm font-bold transition-all ${
+                activeTab === "analysis"
+                  ? "bg-white text-[#0F172A] shadow"
+                  : "text-white/50 hover:text-white/80"
+              }`}
+            >
+              🔍 فرص التوفير
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("compare")}
+              className={`flex-1 rounded-xl py-2.5 text-sm font-bold transition-all ${
+                activeTab === "compare"
+                  ? "bg-white text-[#0F172A] shadow"
+                  : "text-white/50 hover:text-white/80"
+              }`}
+            >
+              ⚖️ قارن صنفين
+            </button>
+          </div>
         </div>
+
+        {/* ════════════ تاب: فرص التوفير ════════════ */}
+        {activeTab === "analysis" && (
+          <div className="px-4 space-y-5 mx-auto max-w-xl">
+
+            {compareItems.length === 0 && habitItems.length === 0 && (
+              <div className="rounded-3xl bg-white/10 p-8 text-center space-y-3 mt-2">
+                <div className="text-5xl">🔍</div>
+                <p className="text-lg font-bold text-white">
+                  {itemsWithItems === 0 ? "ما فيه أصناف بعد" : "ما فيه أصناف متكررة بعد"}
+                </p>
+                <p className="text-sm text-white/60">
+                  {itemsWithItems === 0
+                    ? "لمّا تضيف مصاريف بتفاصيل الأصناف، راح يحللها عمار ويوريك فرص التوفير"
+                    : "كل صنف اشتريته مرة واحدة فقط حتى الآن"}
+                </p>
+              </div>
+            )}
+
+            {totalSavings > 0.5 && (
+              <div className="rounded-3xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 p-5 mt-2">
+                <p className="text-xs font-bold text-emerald-400 mb-1">💡 فرصة التوفير المحتملة</p>
+                <p className="text-3xl font-extrabold text-emerald-300">
+                  {totalSavings.toFixed(1)}
+                  <span className="mr-1 text-base font-semibold text-emerald-400/70">ر.س</span>
+                </p>
+                <p className="text-xs text-white/50 mt-1">
+                  لو اشتريت دايماً من الأرخص — {compareItems.length} صنف من محلات مختلفة
+                </p>
+              </div>
+            )}
+
+            {compareItems.length > 0 && (
+              <div className="rounded-3xl bg-white/8 border border-white/10 p-5 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-12 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-2xl shadow-lg">🧙</div>
+                  <div>
+                    <p className="text-sm font-extrabold text-white">عمار</p>
+                    <p className="text-xs text-white/50">مستشارك المالي الذكي</p>
+                  </div>
+                </div>
+                {advice ? (
+                  <div className="rounded-2xl bg-white/10 px-4 py-3">
+                    <p className="text-sm leading-relaxed text-white/90 whitespace-pre-line">{advice}</p>
+                  </div>
+                ) : adviceError ? (
+                  <div className="rounded-2xl bg-red-500/10 border border-red-500/20 px-4 py-3">
+                    <p className="text-sm text-red-300">{adviceError}</p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-white/50">عندي {compareItems.length} صنف — اضغط وأوريك وين تقدر توفر</p>
+                )}
+                <button type="button" onClick={() => void askAmmar()} disabled={loadingAdvice}
+                  className="w-full rounded-2xl bg-gradient-to-r from-violet-600 to-purple-600 py-3 text-sm font-bold text-white shadow-lg shadow-purple-900/40 transition-opacity hover:opacity-90 disabled:opacity-60 active:scale-[0.98]">
+                  {loadingAdvice ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      عمار يحلل...
+                    </span>
+                  ) : advice ? "🔄 طلب نصيحة جديدة" : "🔮 اطلب نصيحة عمار"}
+                </button>
+              </div>
+            )}
+
+            {compareItems.length > 0 && (
+              <section className="space-y-2">
+                <p className="px-1 text-xs font-bold text-white/50">⚖️ مقارنة المحلات ({compareItems.length})</p>
+                {compareItems.map(item => (
+                  <CompareCard key={item.name} item={item}
+                    expanded={expandedCompare === item.name}
+                    onToggle={() => setExpandedCompare(expandedCompare === item.name ? null : item.name)} />
+                ))}
+              </section>
+            )}
+
+            {habitItems.length > 0 && (
+              <section className="space-y-2">
+                <p className="px-1 text-xs font-bold text-white/50">🔁 عاداتك الشرائية ({habitItems.length})</p>
+                <p className="px-1 text-xs text-white/30">أصناف تشتريها بانتظام — ما في فرق سعر كافٍ بين المحلات</p>
+                <div className="space-y-1.5">
+                  {habitsToShow.map(item => <HabitCard key={item.name} item={item} />)}
+                </div>
+                {habitItems.length > 4 && (
+                  <button type="button" onClick={() => setShowAllHabits(v => !v)}
+                    className="w-full rounded-2xl bg-white/5 py-3 text-xs font-semibold text-white/50 hover:bg-white/10 transition-colors">
+                    {showAllHabits ? "▲ عرض أقل" : `▼ عرض الكل (${habitItems.length})`}
+                  </button>
+                )}
+              </section>
+            )}
+
+          </div>
+        )}
+
+        {/* ════════════ تاب: قارن صنفين ════════════ */}
+        {activeTab === "compare" && (
+          <div className="px-4 space-y-4 mx-auto max-w-xl">
+
+            <p className="px-1 text-xs text-white/40">
+              ابحث عن صنفين من مشترياتك واختر كل واحد، ثم اضغط "قارن" وعمار يحسب لك الأفضل قيمةً للريال
+            </p>
+
+            {/* ── الصنف الأول ── */}
+            <ItemSlot
+              slotNumber={1}
+              selected={slot1}
+              search={search1}
+              onSearchChange={(v) => { setSearch1(v); setActiveSlot(1); if (!v) setActiveSlot(null); }}
+              onFocus={() => setActiveSlot(1)}
+              isActive={activeSlot === 1}
+              results={filtered1}
+              onSelect={(item) => selectForSlot(item, 1)}
+              onClear={() => { setSlot1(null); setSearch1(""); setCompareResult(null); }}
+            />
+
+            {/* ── الصنف الثاني ── */}
+            <ItemSlot
+              slotNumber={2}
+              selected={slot2}
+              search={search2}
+              onSearchChange={(v) => { setSearch2(v); setActiveSlot(2); if (!v) setActiveSlot(null); }}
+              onFocus={() => setActiveSlot(2)}
+              isActive={activeSlot === 2}
+              results={filtered2}
+              onSelect={(item) => selectForSlot(item, 2)}
+              onClear={() => { setSlot2(null); setSearch2(""); setCompareResult(null); }}
+            />
+
+            {/* ── زر القارن ── */}
+            <button
+              type="button"
+              onClick={() => void runCompare()}
+              disabled={!canCompare || loadingCompare}
+              className="w-full rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 py-4 text-base font-bold text-white shadow-lg shadow-orange-900/30 transition-all hover:opacity-90 disabled:opacity-40 active:scale-[0.98]"
+            >
+              {loadingCompare ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                  عمار يحسب...
+                </span>
+              ) : "⚖️ قارن الصنفين"}
+            </button>
+
+            {/* ── خطأ ── */}
+            {compareError && (
+              <div className="rounded-2xl bg-red-500/10 border border-red-500/20 px-4 py-3">
+                <p className="text-sm text-red-300">{compareError}</p>
+              </div>
+            )}
+
+            {/* ── نتيجة المقارنة ── */}
+            {compareResult && slot1 && slot2 && (
+              <CompareResultCard result={compareResult} item1={slot1} item2={slot2} />
+            )}
+
+            {/* placeholder لو ما في أصناف بعد */}
+            {selectableItems.length === 0 && (
+              <div className="rounded-3xl bg-white/8 p-8 text-center space-y-2 mt-2">
+                <div className="text-4xl">📦</div>
+                <p className="text-sm font-bold text-white/70">ما فيه أصناف بعد</p>
+                <p className="text-xs text-white/40">أضف مصاريف بتفاصيل الأصناف وارجع هنا للمقارنة</p>
+              </div>
+            )}
+
+          </div>
+        )}
+
       </main>
       <BottomNav />
     </AuthGuard>
@@ -438,40 +547,195 @@ export default function SmartPage() {
 /* ── Header ── */
 function SmartHeader() {
   return (
-    <div className="px-5 pt-10 pb-5">
+    <div className="px-5 pt-10 pb-4">
       <div className="flex items-center gap-3">
-        <div className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-2xl shadow-lg">
-          🧠
-        </div>
+        <div className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-2xl shadow-lg">🧠</div>
         <div>
           <h1 className="text-2xl font-extrabold text-white">خلك فطين</h1>
-          <p className="text-xs text-white/50">مقارنة أسعار المحلات وعاداتك الشرائية</p>
+          <p className="text-xs text-white/50">مقارنة الأسعار وتحليل عاداتك الشرائية</p>
         </div>
       </div>
     </div>
   );
 }
 
-/* ── بطاقة مقارنة المحلات ── */
+/* ── مربع اختيار الصنف ── */
+function ItemSlot({
+  slotNumber, selected, search, onSearchChange, onFocus,
+  isActive, results, onSelect, onClear,
+}: {
+  slotNumber: 1 | 2;
+  selected: SelectableItem | null;
+  search: string;
+  onSearchChange: (v: string) => void;
+  onFocus: () => void;
+  isActive: boolean;
+  results: SelectableItem[];
+  onSelect: (item: SelectableItem) => void;
+  onClear: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="rounded-2xl bg-white/8 border border-white/10 overflow-visible">
+      {/* رأس المربع */}
+      <div className="flex items-center gap-2 px-4 pt-3 pb-2">
+        <span className={`flex size-6 items-center justify-center rounded-full text-xs font-extrabold ${
+          slotNumber === 1 ? "bg-violet-500/30 text-violet-300" : "bg-amber-500/30 text-amber-300"
+        }`}>{slotNumber}</span>
+        <span className="text-xs font-bold text-white/60">الصنف {slotNumber === 1 ? "الأول" : "الثاني"}</span>
+        {selected && (
+          <button type="button" onClick={onClear}
+            className="mr-auto text-xs text-white/30 hover:text-red-400 transition-colors">
+            ✕ مسح
+          </button>
+        )}
+      </div>
+
+      {/* الصنف المختار أو مربع البحث */}
+      {selected ? (
+        <div className="px-4 pb-4">
+          <div className="rounded-xl bg-white/10 px-3 py-3 space-y-0.5">
+            <p className="text-sm font-bold text-white">{selected.name}</p>
+            <p className="text-xs text-white/50">
+              {selected.unit_price.toFixed(2)} ر.س
+              {selected.quantity > 1 && ` × ${selected.quantity}`}
+              {selected.store && ` · ${selected.store}`}
+              {selected.date && ` · ${formatDateShort(selected.date)}`}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="px-4 pb-3 relative">
+          <input
+            ref={inputRef}
+            type="text"
+            value={search}
+            onChange={e => onSearchChange(e.target.value)}
+            onFocus={onFocus}
+            placeholder="ابحث عن صنف... مثل: حفائظ، أرز، عصير"
+            className="w-full rounded-xl bg-white/10 px-3 py-2.5 text-sm text-white placeholder-white/30 outline-none focus:bg-white/15 focus:ring-1 focus:ring-white/20"
+            dir="rtl"
+          />
+
+          {/* نتائج البحث */}
+          {isActive && results.length > 0 && (
+            <div className="absolute right-4 left-4 top-full z-20 mt-1 max-h-52 overflow-y-auto rounded-2xl bg-[#1E293B] border border-white/10 shadow-2xl">
+              {results.slice(0, 12).map(item => (
+                <button
+                  key={item.uid}
+                  type="button"
+                  onClick={() => onSelect(item)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-right hover:bg-white/8 transition-colors border-b border-white/5 last:border-0"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-white truncate">{item.name}</p>
+                    <p className="text-xs text-white/40 truncate">
+                      {item.store ?? "غير محدد"} · {formatDateShort(item.date)}
+                    </p>
+                  </div>
+                  <span className="flex-shrink-0 text-xs font-bold text-emerald-400 tabular-nums">
+                    {item.unit_price.toFixed(2)} ر.س
+                  </span>
+                </button>
+              ))}
+              {results.length > 12 && (
+                <p className="px-3 py-2 text-xs text-white/30 text-center">وغيرهم {results.length - 12}... دقق البحث أكثر</p>
+              )}
+            </div>
+          )}
+
+          {isActive && search.trim().length > 0 && results.length === 0 && (
+            <div className="absolute right-4 left-4 top-full z-20 mt-1 rounded-2xl bg-[#1E293B] border border-white/10 px-4 py-3 text-center shadow-2xl">
+              <p className="text-xs text-white/40">ما لقينا "{search}" في مشترياتك</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── نتيجة المقارنة ── */
+function CompareResultCard({ result, item1, item2 }: {
+  result: CompareResult;
+  item1: SelectableItem;
+  item2: SelectableItem;
+}) {
+  const winnerItem = result.winner === 1 ? item1 : result.winner === 2 ? item2 : null;
+  const loserItem = result.winner === 1 ? item2 : result.winner === 2 ? item1 : null;
+  const winnerUnitPrice = result.winner === 1 ? result.item1_price_per_unit : result.item2_price_per_unit;
+  const loserUnitPrice = result.winner === 1 ? result.item2_price_per_unit : result.item1_price_per_unit;
+
+  if (!result.comparable) {
+    return (
+      <div className="rounded-3xl bg-amber-500/10 border border-amber-500/25 p-5 text-center space-y-3">
+        <div className="text-4xl">🤦</div>
+        <p className="text-base font-extrabold text-amber-300">المقارنة ما تجي!</p>
+        <p className="text-sm text-white/70 leading-relaxed">{result.message}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-3xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/25 p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <div className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-lg">🧙</div>
+        <p className="text-sm font-extrabold text-white">نتيجة المقارنة</p>
+      </div>
+
+      {/* المقارنة المرئية */}
+      {result.item1_price_per_unit !== null && result.item2_price_per_unit !== null && result.unit_label && (
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { item: item1, price_per_unit: result.item1_price_per_unit, isWinner: result.winner === 1 },
+            { item: item2, price_per_unit: result.item2_price_per_unit, isWinner: result.winner === 2 },
+          ].map(({ item, price_per_unit, isWinner }, idx) => (
+            <div key={idx} className={`rounded-2xl p-3 text-center space-y-1 ${
+              isWinner
+                ? "bg-emerald-500/20 border border-emerald-500/40 ring-1 ring-emerald-400/30"
+                : "bg-white/5 border border-white/10"
+            }`}>
+              {isWinner && <p className="text-xs font-bold text-emerald-400">🏆 الأفضل قيمةً</p>}
+              <p className="text-xs font-semibold text-white/70 leading-snug truncate">{item.name}</p>
+              {item.store && <p className="text-[10px] text-white/40">{item.store}</p>}
+              <p className={`text-xl font-extrabold tabular-nums ${isWinner ? "text-emerald-300" : "text-white/60"}`}>
+                {price_per_unit.toFixed(2)}
+              </p>
+              <p className="text-[10px] text-white/40">ر.س / {result.unit_label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* رسالة عمار */}
+      <div className="rounded-2xl bg-white/8 px-4 py-3">
+        <p className="text-sm leading-relaxed text-white/85 whitespace-pre-line">{result.message}</p>
+      </div>
+
+      {/* ملخص التوفير */}
+      {result.savings_percent !== null && result.savings_percent > 0 && winnerItem && loserItem && (
+        <div className="flex items-center justify-between rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-xs">
+          <span className="text-white/50">الفرق في السعر للوحدة</span>
+          <span className="font-extrabold text-emerald-300">{result.savings_percent.toFixed(0)}% أرخص</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── بطاقة مقارنة المحلات (تاب التحليل) ── */
 function CompareCard({ item, expanded, onToggle }: {
-  item: CompareItem;
-  expanded: boolean;
-  onToggle: () => void;
+  item: CompareItem; expanded: boolean; onToggle: () => void;
 }) {
   const cheapestPrice = item.storeStats[0]!.avgPrice;
   const mostExpensivePrice = item.storeStats[item.storeStats.length - 1]!.avgPrice;
 
   return (
     <div className="rounded-2xl bg-white/8 border border-white/10 overflow-hidden">
-      {/* الصف الرئيسي */}
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center gap-3 px-4 py-3.5 text-right"
-      >
-        <div className="flex size-10 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-xl">
-          ⚖️
-        </div>
+      <button type="button" onClick={onToggle}
+        className="w-full flex items-center gap-3 px-4 py-3.5 text-right">
+        <div className="flex size-10 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-xl">⚖️</div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold text-white truncate">{item.name}</p>
           <p className="text-xs text-white/50 mt-0.5">
@@ -491,18 +755,13 @@ function CompareCard({ item, expanded, onToggle }: {
         </div>
       </button>
 
-      {/* التفاصيل */}
       {expanded && (
         <div className="border-t border-white/10 px-4 py-4 space-y-4">
-
-          {/* مقارنة المحلات */}
           <div className="space-y-2">
             <p className="text-xs text-white/40 font-semibold">مقارنة أسعار المحلات:</p>
             {item.storeStats.map((s, idx) => {
               const isMin = idx === 0;
-              const barWidth = cheapestPrice > 0
-                ? Math.max(20, (s.avgPrice / mostExpensivePrice) * 100)
-                : 50;
+              const barWidth = Math.max(20, (s.avgPrice / mostExpensivePrice) * 100);
               return (
                 <div key={s.store} className="space-y-1">
                   <div className="flex items-center justify-between text-xs">
@@ -515,17 +774,14 @@ function CompareCard({ item, expanded, onToggle }: {
                     </span>
                   </div>
                   <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
-                    <div
-                      className={`h-1.5 rounded-full ${isMin ? "bg-emerald-400" : "bg-white/30"}`}
-                      style={{ width: `${barWidth}%` }}
-                    />
+                    <div className={`h-1.5 rounded-full ${isMin ? "bg-emerald-400" : "bg-white/30"}`}
+                      style={{ width: `${barWidth}%` }} />
                   </div>
                 </div>
               );
             })}
           </div>
 
-          {/* توصية التوفير */}
           {item.potentialSavings > 0.1 && (
             <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2.5">
               <p className="text-xs text-emerald-300 font-semibold">
@@ -534,14 +790,11 @@ function CompareCard({ item, expanded, onToggle }: {
             </div>
           )}
 
-          {/* سجل الشراء */}
           <div className="space-y-1.5">
             <p className="text-xs text-white/40 font-semibold">سجل الشراء:</p>
             {item.allPurchases.slice(0, 6).map((p, i) => (
               <div key={i} className="flex items-center justify-between text-xs">
-                <span className="text-white/50">
-                  {p.store ?? "غير محدد"} · {formatDateShort(p.date)}
-                </span>
+                <span className="text-white/50">{p.store ?? "غير محدد"} · {formatDateShort(p.date)}</span>
                 <span className={`font-bold tabular-nums ${p.unit_price === item.storeStats[0]!.minPrice ? "text-emerald-400" : "text-white/60"}`}>
                   {p.unit_price.toFixed(2)} ر.س
                   {p.quantity > 1 && <span className="text-white/30 font-normal"> ×{p.quantity}</span>}
@@ -553,9 +806,8 @@ function CompareCard({ item, expanded, onToggle }: {
             )}
           </div>
 
-          {/* إجمالي */}
           <div className="flex items-center justify-between rounded-xl bg-white/5 px-3 py-2 text-xs">
-            <span className="text-white/40">إجمالي ما صرفته على هذا الصنف</span>
+            <span className="text-white/40">إجمالي ما صرفته</span>
             <span className="font-extrabold text-white tabular-nums">{item.totalSpent.toFixed(2)} ر.س</span>
           </div>
         </div>
@@ -568,9 +820,7 @@ function CompareCard({ item, expanded, onToggle }: {
 function HabitCard({ item }: { item: HabitItem }) {
   return (
     <div className="flex items-center gap-3 rounded-2xl bg-white/5 border border-white/5 px-4 py-3">
-      <div className="flex size-9 flex-shrink-0 items-center justify-center rounded-xl bg-white/8 text-lg">
-        🔁
-      </div>
+      <div className="flex size-9 flex-shrink-0 items-center justify-center rounded-xl bg-white/8 text-lg">🔁</div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-white/80 truncate">{item.name}</p>
         <p className="text-xs text-white/40 mt-0.5">
