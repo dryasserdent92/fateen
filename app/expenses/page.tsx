@@ -30,9 +30,7 @@ type Expense = {
 const CATEGORY_ICONS: Record<string, string> = {
   مطاعم: "🍽️",
   قهوة: "☕",
-  بنزيني: "⛽",
-  "بنزين السواق": "🚖",
-  "بنزين عام": "🛢️",
+  بنزين: "⛽",
   سيارة: "🚗",
   سوبرماركت: "🛒",
   تسوق: "🛍️",
@@ -345,11 +343,6 @@ export default function ExpensesPage() {
   const allCategoryIcons: Record<string, string> = { ...CATEGORY_ICONS };
   (userSettings.customCategories ?? []).forEach(c => { allCategoryIcons[c.name] = c.icon; });
 
-  /* إجمالي البنزين (كل الأنواع مجمّعة) */
-  const FUEL_CATS = ["بنزيني", "بنزين السواق", "بنزين عام"];
-  const fuelTotal = FUEL_CATS.reduce((s, cat) => s + (categoryStats[cat]?.total ?? 0), 0);
-  const fuelCount = FUEL_CATS.reduce((s, cat) => s + (categoryStats[cat]?.count ?? 0), 0);
-  const hasFuelBreakdown = FUEL_CATS.filter(c => categoryStats[c]?.count).length > 1;
 
   /* الميزانية — تظهر فقط للشهر الحالي */
   const periodStart = getPeriodStart(todaySAStr, userSettings.startDay);
@@ -550,31 +543,6 @@ export default function ExpensesPage() {
             {sortedCategories.length > 0 && (
               <div className="mt-4 space-y-2">
                 <p className="text-xs font-semibold text-gray-400 px-1">الإجمالي حسب التصنيف</p>
-
-                {/* بطاقة إجمالي البنزين — تظهر فقط إذا فيه أكثر من نوع */}
-                {hasFuelBreakdown && fuelTotal > 0 && (
-                  <div className="rounded-2xl bg-orange-50 border border-orange-200 px-3 py-2.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-base">⛽</span>
-                        <span className="text-xs font-bold text-orange-700">إجمالي البنزين</span>
-                        <span className="text-xs text-orange-400 bg-orange-100 rounded-full px-1.5 py-0.5">{fuelCount}×</span>
-                      </div>
-                      <p className="text-lg font-extrabold text-orange-600">
-                        {fuelTotal.toFixed(2)}
-                        <span className="mr-0.5 text-xs font-normal text-orange-400">ر.س</span>
-                      </p>
-                    </div>
-                    {/* تفصيل الأنواع */}
-                    <div className="mt-2 flex gap-2 flex-wrap">
-                      {FUEL_CATS.filter(c => categoryStats[c]?.count).map(c => (
-                        <span key={c} className="text-xs text-orange-600 bg-orange-100 rounded-full px-2 py-0.5">
-                          {c === "بنزيني" ? "⛽" : c === "بنزين السواق" ? "🚖" : "🛢️"} {c}: {categoryStats[c]!.total.toFixed(0)} ر.س
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 <div className="grid grid-cols-2 gap-2">
                   {sortedCategories.map(([cat, { total, count }]) => {

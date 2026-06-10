@@ -7,7 +7,7 @@ import { supabase } from "../../lib/supabase";
 import { apiUrl } from "../../lib/api-client";
 import { loadSettings } from "../../lib/user-settings";
 
-const DEFAULT_CATEGORIES = ["مطاعم", "قهوة", "بنزيني", "بنزين السواق", "بنزين عام", "سيارة", "سوبرماركت", "تسوق", "صحة", "فواتير", "رواتب", "أخرى"];
+const DEFAULT_CATEGORIES = ["مطاعم", "قهوة", "بنزين", "سيارة", "سوبرماركت", "تسوق", "صحة", "فواتير", "رواتب", "أخرى"];
 type Category = string;
 type InputMethod = "image" | "sms" | "voice";
 type Step = "input" | "review" | "saved";
