@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserIdFromRequest } from "../../../lib/auth";
 
-type RepeatItemStat = {
-  name: string;
-  count: number;
+type StoreStat = {
+  store: string;
   avgPrice: number;
   minPrice: number;
-  maxPrice: number;
-  cheapestStore: string | null;
-  stores: string[];
-  totalSpent: number;
+  count: number;
+};
+
+type CompareItemPayload = {
+  name: string;
+  storeStats: StoreStat[];
+  cheapestStore: string;
+  priceDiff: number;
   potentialSavings: number;
+  count: number;
+  totalSpent: number;
 };
 
 export async function POST(req: NextRequest) {
@@ -24,7 +29,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No ANTHROPIC_API_KEY" }, { status: 500 });
   }
 
-  const body = (await req.json()) as { items: RepeatItemStat[] };
+  const body = (await req.json()) as { items: CompareItemPayload[] };
   const items = body.items ?? [];
 
   if (items.length === 0) {
@@ -33,11 +38,13 @@ export async function POST(req: NextRequest) {
 
   // بناء نص ملخص البيانات
   const summaryLines = items.slice(0, 10).map((item, i) => {
-    const stores = item.stores.length > 0 ? item.stores.join("، ") : "متاجر متعددة";
-    const savings = item.potentialSavings > 0
-      ? ` (توفير محتمل: ${item.potentialSavings.toFixed(1)} ر.س لو اشتريته دايماً من الأرخص)`
+    const storeLines = item.storeStats
+      .map(s => `${s.store}: ${s.avgPrice.toFixed(2)} ر.س (${s.count} مرة)`)
+      .join(" | ");
+    const savings = item.potentialSavings > 0.5
+      ? ` — توفير محتمل: ${item.potentialSavings.toFixed(1)} ر.س`
       : "";
-    return `${i + 1}. ${item.name}: اشتريته ${item.count} مرة، متوسط السعر ${item.avgPrice.toFixed(2)} ر.س، أرخص سعر ${item.minPrice.toFixed(2)} ر.س من ${item.cheapestStore ?? "غير محدد"}، المتاجر: ${stores}${savings}`;
+    return `${i + 1}. ${item.name}: اشتريته ${item.count} مرة من محلات مختلفة. الأسعار: ${storeLines}. أرخص محل: ${item.cheapestStore}${savings}`;
   });
 
   const prompt = `أنت "عمار"، مستشار مالي ذكي وودود متخصص في مساعدة السعوديين على توفير مصاريفهم اليومية. أسلوبك مباشر، عملي، وفيه شوية طرافة سعودية.
