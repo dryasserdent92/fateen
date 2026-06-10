@@ -5,9 +5,10 @@ import Link from "next/link";
 import AuthGuard from "../components/auth-guard";
 import { supabase } from "../../lib/supabase";
 import { apiUrl } from "../../lib/api-client";
+import { loadSettings } from "../../lib/user-settings";
 
-const CATEGORIES = ["مطاعم", "قهوة", "بنزيني", "بنزين السواق", "بنزين عام", "سيارة", "سوبرماركت", "تسوق", "صحة", "فواتير", "رواتب", "أخرى"] as const;
-type Category = (typeof CATEGORIES)[number];
+const DEFAULT_CATEGORIES = ["مطاعم", "قهوة", "بنزيني", "بنزين السواق", "بنزين عام", "سيارة", "سوبرماركت", "تسوق", "صحة", "فواتير", "رواتب", "أخرى"];
+type Category = string;
 type InputMethod = "image" | "sms" | "voice";
 type Step = "input" | "review" | "saved";
 
@@ -108,6 +109,14 @@ export default function AddExpensePage() {
     store: "", amount: "", date: todaySA(), category: "أخرى",
     item_name: "", item_brand: "", items: null,
   });
+
+  /* التصنيفات المخصصة */
+  const [allCategories, setAllCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  useEffect(() => {
+    const s = loadSettings();
+    const customNames = s.customCategories.map(c => c.name);
+    setAllCategories([...DEFAULT_CATEGORIES, ...customNames]);
+  }, []);
 
   /* cleanup on unmount */
   useEffect(() => () => {
@@ -517,7 +526,7 @@ export default function AddExpensePage() {
                     onChange={(e) => setExpense((p) => ({ ...p, category: e.target.value as Category }))}
                     className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2"
                   >
-                    {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                    {allCategories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
                 </div>
 

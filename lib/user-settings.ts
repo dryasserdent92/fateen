@@ -1,24 +1,32 @@
 // إعدادات المستخدم المحفوظة في localStorage
 
+export type CustomCategory = { name: string; icon: string };
+
 export interface UserSettings {
-  startDay: number;   // يوم بداية الشهر (1-28)، افتراضي 1
-  budget: number;     // الميزانية الشهرية (0 = غير محددة)
+  startDay: number;          // يوم بداية الشهر (1-28)، افتراضي 1
+  budget: number;            // الميزانية الشهرية (0 = غير محددة)
+  customCategories: CustomCategory[];  // تصنيفات مخصصة أضافها المستخدم
 }
 
 const KEY = "fateen_settings";
 
+const DEFAULTS: UserSettings = { startDay: 1, budget: 0, customCategories: [] };
+
 export function loadSettings(): UserSettings {
-  if (typeof window === "undefined") return { startDay: 1, budget: 0 };
+  if (typeof window === "undefined") return { ...DEFAULTS };
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { startDay: 1, budget: 0 };
+    if (!raw) return { ...DEFAULTS };
     const parsed = JSON.parse(raw) as Partial<UserSettings>;
     return {
       startDay: typeof parsed.startDay === "number" && parsed.startDay >= 1 && parsed.startDay <= 28
         ? parsed.startDay : 1,
       budget: typeof parsed.budget === "number" && parsed.budget >= 0 ? parsed.budget : 0,
+      customCategories: Array.isArray(parsed.customCategories)
+        ? (parsed.customCategories as CustomCategory[]).filter(c => c && typeof c.name === "string" && c.name.trim())
+        : [],
     };
-  } catch { return { startDay: 1, budget: 0 }; }
+  } catch { return { ...DEFAULTS }; }
 }
 
 export function saveSettings(s: UserSettings) {

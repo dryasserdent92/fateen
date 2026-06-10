@@ -6,7 +6,7 @@ import { supabase } from "../../lib/supabase";
 import { apiUrl } from "../../lib/api-client";
 import AuthGuard from "../components/auth-guard";
 import BottomNav from "../components/bottom-nav";
-import { loadSettings, getPeriodStart } from "../../lib/user-settings";
+import { loadSettings, getPeriodStart, type UserSettings } from "../../lib/user-settings";
 
 type ExpenseItem = {
   name: string;
@@ -80,7 +80,7 @@ export default function ExpensesPage() {
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<number | string>>(new Set());
   const [deleting, setDeleting] = useState(false);
-  const [userSettings, setUserSettings] = useState({ startDay: 1, budget: 0 });
+  const [userSettings, setUserSettings] = useState<UserSettings>({ startDay: 1, budget: 0, customCategories: [] });
 
   /* فلتر الشهر — يبدأ بالشهر الحالي */
   const [selectedMonthKey, setSelectedMonthKey] = useState<string>(() =>
@@ -331,6 +331,10 @@ export default function ExpensesPage() {
   }, {});
   const sortedCategories = Object.entries(categoryStats).sort((a, b) => b[1].total - a[1].total);
 
+  /* دمج التصنيفات الافتراضية مع التصنيفات المخصصة */
+  const allCategoryIcons: Record<string, string> = { ...CATEGORY_ICONS };
+  (userSettings.customCategories ?? []).forEach(c => { allCategoryIcons[c.name] = c.icon; });
+
   /* إجمالي البنزين (كل الأنواع مجمّعة) */
   const FUEL_CATS = ["بنزيني", "بنزين السواق", "بنزين عام"];
   const fuelTotal = FUEL_CATS.reduce((s, cat) => s + (categoryStats[cat]?.total ?? 0), 0);
@@ -483,7 +487,7 @@ export default function ExpensesPage() {
                       >
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-base">{CATEGORY_ICONS[cat] ?? "💳"}</span>
+                            <span className="text-base">{allCategoryIcons[cat] ?? "💳"}</span>
                             <span className={`text-xs font-semibold truncate ${isActive ? "text-white" : "text-gray-600"}`}>{cat}</span>
                           </div>
                           <span className={`text-xs font-bold rounded-full px-1.5 py-0.5 ${isActive ? "bg-white/20 text-white" : "bg-gray-100 text-gray-400"}`}>
@@ -584,7 +588,7 @@ export default function ExpensesPage() {
           {filterCategory && (
             <div className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 shadow">
               <div className="flex items-center gap-2">
-                <span className="text-xl">{CATEGORY_ICONS[filterCategory] ?? "💳"}</span>
+                <span className="text-xl">{allCategoryIcons[filterCategory] ?? "💳"}</span>
                 <div>
                   <p className="text-sm font-bold text-gray-800">{filterCategory}</p>
                   <p className="text-xs text-gray-400">{visibleExpenses.length} مصروف</p>
@@ -820,7 +824,7 @@ export default function ExpensesPage() {
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-gray-500">🏷️ التصنيف</label>
                 <div className="grid grid-cols-4 gap-2">
-                  {Object.entries(CATEGORY_ICONS).map(([cat, icon]) => (
+                  {Object.entries(allCategoryIcons).map(([cat, icon]) => (
                     <button
                       key={cat}
                       type="button"
