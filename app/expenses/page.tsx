@@ -40,6 +40,25 @@ const CATEGORY_ICONS: Record<string, string> = {
   أخرى: "💳",
 };
 
+const CATEGORY_COLORS: Record<string, string> = {
+  مطاعم:    "#F97316",
+  قهوة:     "#A16207",
+  بنزين:    "#EAB308",
+  سيارة:    "#2563EB",
+  سوبرماركت:"#16A34A",
+  تسوق:     "#DB2777",
+  صحة:      "#0891B2",
+  فواتير:   "#7C3AED",
+  رواتب:    "#475569",
+  أخرى:     "#94A3B8",
+};
+
+const FALLBACK_COLORS = ["#1D9E75","#F97316","#3B82F6","#EC4899","#EAB308","#8B5CF6","#14B8A6","#64748B","#22C55E","#F43F5E"];
+
+function catColor(cat: string, idx: number): string {
+  return CATEGORY_COLORS[cat] ?? FALLBACK_COLORS[idx % FALLBACK_COLORS.length]!;
+}
+
 function toNumber(value: number | string | null): number {
   if (typeof value === "number") return value;
   if (typeof value === "string") {
@@ -73,6 +92,9 @@ export default function ExpensesPage() {
 
   /* البحث */
   const [searchQuery, setSearchQuery] = useState("");
+
+  /* عرض الرسوم أو القائمة */
+  const [viewMode, setViewMode] = useState<"list" | "charts">("list");
 
   /* التوسيع في المكان */
   const [expandedId, setExpandedId] = useState<number | string | null>(null);
@@ -660,7 +682,20 @@ export default function ExpensesPage() {
                   <>
                     <button
                       type="button"
-                      onClick={() => { setReorderMode(r => !r); setSelectMode(false); }}
+                      onClick={() => {
+                        setViewMode(v => v === "charts" ? "list" : "charts");
+                        setReorderMode(false);
+                        setSelectMode(false);
+                      }}
+                      className={`rounded-2xl px-4 py-4 text-sm font-bold shadow transition-all ${
+                        viewMode === "charts" ? "bg-[#1D9E75] text-white" : "bg-white text-gray-500"
+                      }`}
+                    >
+                      📊
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setReorderMode(r => !r); setSelectMode(false); setViewMode("list"); }}
                       className={`rounded-2xl px-4 py-4 text-sm font-bold shadow transition-all ${
                         reorderMode ? "bg-[#1D9E75] text-white" : "bg-white text-gray-500"
                       }`}
@@ -744,8 +779,23 @@ export default function ExpensesPage() {
             </div>
           )}
 
+          {/* ── الرسوم البيانية ── */}
+          {viewMode === "charts" && !loading && selectedMonthExpenses.length > 0 && (
+            <div className="space-y-4">
+              <DonutChart
+                categories={sortedCategories}
+                total={currentMonthTotal}
+                allCategoryIcons={allCategoryIcons}
+              />
+              <DailyBarsChart
+                expenses={selectedMonthExpenses}
+                monthKey={selectedMonthKey}
+              />
+            </div>
+          )}
+
           {/* Expenses list */}
-          <section className="space-y-3">
+          <section className={`space-y-3 ${viewMode === "charts" ? "hidden" : ""}`}>
             {loading ? (
               <div className="flex justify-center py-10">
                 <span className="size-8 animate-spin rounded-full border-4 border-white border-t-transparent" />
@@ -1213,5 +1263,268 @@ export default function ExpensesPage() {
         </div>
       )}
     </AuthGuard>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   مكوّن: Donut Chart — توزيع التصنيفات
+═══════════════════════════════════════════════ */
+function DonutChart({
+  categories,
+  total,
+  allCategoryIcons,
+}: {
+  categories: [string, { total: number; count: number }][];
+  total: number;
+  allCategoryIcons: Record<string, string>;
+}) {
+  const cx = 100; const cy = 100;
+  const R = 78;  // نصف قطر خارجي
+  const r = 50;  // نصف قطر داخلي (الثقب)
+  const circ = 2 * Math.PI * R;
+
+  /* احسب arc path لكل تصنيف */
+  type Segment = { cat: string; total: number; count: number; color: string; startAngle: number; endAngle: number };
+  const segments: Segment[] = [];
+  let cumAngle = -90; // ابدأ من أعلى
+
+  categories.forEach(([cat, { total: t, count }], idx) => {
+    const angle = total > 0 ? (t / total) * 360 : 0;
+    segments.push({
+      cat, total: t, count,
+      color: catColor(cat, idx),
+      startAngle: cumAngle,
+      endAngle: cumAngle + angle,
+    });
+    cumAngle += angle;
+  });
+
+  function polar(angle: number, radius: number) {
+    const rad = (angle * Math.PI) / 180;
+    return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
+  }
+
+  function donutPath(startAngle: number, endAngle: number): string {
+    // لو الزاوية صغيرة جداً تجاهل
+    if (endAngle - startAngle < 0.5) return "";
+    // لو تقريباً دائرة كاملة، تجنب خلل SVG
+    const sweep = Math.min(endAngle - startAngle, 359.9);
+    const endA = startAngle + sweep;
+    const outerS = polar(startAngle, R);
+    const outerE = polar(endA, R);
+    const innerS = polar(startAngle, r);
+    const innerE = polar(endA, r);
+    const large = sweep > 180 ? 1 : 0;
+    return [
+      `M ${outerS.x.toFixed(2)} ${outerS.y.toFixed(2)}`,
+      `A ${R} ${R} 0 ${large} 1 ${outerE.x.toFixed(2)} ${outerE.y.toFixed(2)}`,
+      `L ${innerE.x.toFixed(2)} ${innerE.y.toFixed(2)}`,
+      `A ${r} ${r} 0 ${large} 0 ${innerS.x.toFixed(2)} ${innerS.y.toFixed(2)}`,
+      "Z",
+    ].join(" ");
+  }
+
+  return (
+    <div className="rounded-3xl bg-white p-5 shadow-lg space-y-4">
+      <p className="text-sm font-extrabold text-gray-700">🥧 توزيع المصاريف حسب التصنيف</p>
+
+      {/* الرسم الدائري */}
+      <div className="flex items-center gap-4">
+        <svg viewBox="0 0 200 200" className="w-44 h-44 flex-shrink-0 drop-shadow-sm">
+          {segments.map(seg => (
+            <path
+              key={seg.cat}
+              d={donutPath(seg.startAngle, seg.endAngle)}
+              fill={seg.color}
+              stroke="white"
+              strokeWidth="2"
+            />
+          ))}
+          {/* نص المجموع في المركز */}
+          <text x="100" y="94" textAnchor="middle" className="text-sm" fontSize="13" fontWeight="800" fill="#374151">
+            {total.toFixed(0)}
+          </text>
+          <text x="100" y="112" textAnchor="middle" fontSize="9" fill="#9CA3AF" fontWeight="600">
+            ر.س
+          </text>
+        </svg>
+
+        {/* أسطورة */}
+        <div className="flex-1 space-y-1.5 min-w-0">
+          {segments.map(seg => (
+            <div key={seg.cat} className="flex items-center gap-2">
+              <span className="flex-shrink-0 size-3 rounded-sm" style={{ backgroundColor: seg.color }} />
+              <span className="text-xs font-medium text-gray-600 truncate flex-1">
+                {allCategoryIcons[seg.cat] ?? "💳"} {seg.cat}
+              </span>
+              <span className="text-xs font-bold text-gray-800 tabular-nums flex-shrink-0">
+                {total > 0 ? ((seg.total / total) * 100).toFixed(0) : 0}%
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* أشرطة التصنيفات */}
+      <div className="space-y-2 border-t border-gray-100 pt-3">
+        {segments.map(seg => (
+          <div key={seg.cat} className="space-y-0.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium text-gray-600">
+                {allCategoryIcons[seg.cat] ?? "💳"} {seg.cat}
+                <span className="text-gray-400 font-normal mr-1">({seg.count}×)</span>
+              </span>
+              <span className="font-extrabold tabular-nums" style={{ color: catColor(seg.cat, segments.indexOf(seg)) }}>
+                {seg.total.toFixed(2)} ر.س
+              </span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
+              <div
+                className="h-2 rounded-full transition-all duration-500"
+                style={{
+                  width: `${total > 0 ? (seg.total / total) * 100 : 0}%`,
+                  backgroundColor: catColor(seg.cat, segments.indexOf(seg)),
+                }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   مكوّن: Daily Bars — إنفاق كل يوم في الشهر
+═══════════════════════════════════════════════ */
+function DailyBarsChart({
+  expenses,
+  monthKey,
+}: {
+  expenses: { date: string | null; amount: number | null; category: string | null }[];
+  monthKey: string;
+}) {
+  /* عدد أيام الشهر */
+  const [year, month] = monthKey.split("-").map(Number);
+  const daysInMonth = new Date(year!, month!, 0).getDate();
+
+  /* مجموع كل يوم */
+  const dayTotals: number[] = Array(daysInMonth).fill(0);
+  const dayCats: (string | null)[] = Array(daysInMonth).fill(null);
+
+  for (const exp of expenses) {
+    if (!exp.date) continue;
+    const day = parseInt(exp.date.split("-")[2] ?? "0");
+    if (day >= 1 && day <= daysInMonth) {
+      dayTotals[day - 1]! += Math.abs(Number(exp.amount) || 0);
+      // أعلى تصنيف لليوم (بسيط: آخر واحد)
+      if (exp.category) dayCats[day - 1] = exp.category;
+    }
+  }
+
+  const maxVal = Math.max(...dayTotals, 1);
+
+  /* اليوم الحالي */
+  const todayDay = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }).split("-")[2];
+  const todayNum = todayDay ? parseInt(todayDay) : -1;
+
+  const activedays = dayTotals.filter(v => v > 0).length;
+  const totalSpent = dayTotals.reduce((a, b) => a + b, 0);
+  const avgDay = activedays > 0 ? totalSpent / activedays : 0;
+
+  /* SVG dimensions */
+  const BAR_W = 8;
+  const BAR_GAP = 3;
+  const CHART_H = 80;
+  const svgW = daysInMonth * (BAR_W + BAR_GAP);
+
+  return (
+    <div className="rounded-3xl bg-white p-5 shadow-lg space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-extrabold text-gray-700">📅 الإنفاق اليومي</p>
+        <div className="text-left">
+          <p className="text-xs text-gray-400">متوسط يوم نشط</p>
+          <p className="text-sm font-bold text-[#1D9E75] tabular-nums">{avgDay.toFixed(1)} ر.س</p>
+        </div>
+      </div>
+
+      {/* SVG bars */}
+      <div className="overflow-x-auto pb-1">
+        <svg
+          viewBox={`0 0 ${svgW} ${CHART_H + 18}`}
+          width={Math.max(svgW, 300)}
+          height={CHART_H + 18}
+          style={{ minWidth: svgW }}
+        >
+          {dayTotals.map((val, i) => {
+            const barH = val > 0 ? Math.max(4, (val / maxVal) * CHART_H) : 2;
+            const x = i * (BAR_W + BAR_GAP);
+            const y = CHART_H - barH;
+            const isToday = (i + 1) === todayNum;
+            const cat = dayCats[i];
+            const color = val > 0
+              ? (cat ? catColor(cat, 0) : "#1D9E75")
+              : "#E5E7EB";
+            const dayLabel = String(i + 1);
+
+            return (
+              <g key={i}>
+                <rect
+                  x={x}
+                  y={y}
+                  width={BAR_W}
+                  height={barH}
+                  rx="2"
+                  fill={isToday ? "#1D9E75" : color}
+                  opacity={val > 0 ? 1 : 0.4}
+                />
+                {/* اليوم الحالي — نقطة */}
+                {isToday && (
+                  <circle cx={x + BAR_W / 2} cy={y - 4} r="2.5" fill="#1D9E75" />
+                )}
+                {/* رقم اليوم — كل 5 أيام */}
+                {(i === 0 || (i + 1) % 5 === 0 || i + 1 === daysInMonth) && (
+                  <text
+                    x={x + BAR_W / 2}
+                    y={CHART_H + 12}
+                    textAnchor="middle"
+                    fontSize="7"
+                    fill={isToday ? "#1D9E75" : "#9CA3AF"}
+                    fontWeight={isToday ? "800" : "400"}
+                  >
+                    {dayLabel}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
+          {/* خط المتوسط */}
+          {avgDay > 0 && (
+            <line
+              x1="0"
+              y1={CHART_H - (avgDay / maxVal) * CHART_H}
+              x2={svgW}
+              y2={CHART_H - (avgDay / maxVal) * CHART_H}
+              stroke="#1D9E75"
+              strokeWidth="0.8"
+              strokeDasharray="3 2"
+              opacity="0.5"
+            />
+          )}
+        </svg>
+      </div>
+
+      {/* أعلى يوم إنفاق */}
+      {(() => {
+        const maxIdx = dayTotals.indexOf(maxVal);
+        return maxVal > 0 ? (
+          <div className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2 text-xs">
+            <span className="text-gray-500">أعلى يوم إنفاق: {maxIdx + 1} {["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"][(month ?? 1) - 1]}</span>
+            <span className="font-extrabold text-red-500 tabular-nums">{maxVal.toFixed(2)} ر.س</span>
+          </div>
+        ) : null;
+      })()}
+    </div>
   );
 }
