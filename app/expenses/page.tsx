@@ -936,46 +936,6 @@ export default function ExpensesPage() {
                   className="rounded-full bg-gray-100 p-2 text-gray-400 hover:bg-gray-200"
                 >✕</button>
               </div>
-
-              {/* مؤشر التقييم الحي */}
-              {(() => {
-                const oldSc = editingExpense ? scoreExpense(editingExpense) : 1;
-                const newSc = computeEditScore();
-                const newLb = scoreLabel(newSc);
-                return (
-                  <div className={`mt-3 rounded-2xl px-4 py-3 ${newSc >= 8 ? "bg-emerald-50 border border-emerald-100" : "bg-amber-50 border border-amber-100"}`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">{newLb.emoji}</span>
-                        <div>
-                          <p className="text-xs font-bold text-gray-700">تقييم جودة البيانات</p>
-                          <p className={`text-xs ${newLb.color}`}>{newLb.text}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-sm font-extrabold">
-                        {newSc !== oldSc && (
-                          <span className="text-gray-300 line-through text-xs">{oldSc}/10</span>
-                        )}
-                        <span className={newLb.color}>{newSc}/10</span>
-                      </div>
-                    </div>
-                    {newSc < 8 && (
-                      <p className="mt-2 text-xs text-amber-700 bg-amber-100 rounded-xl px-3 py-1.5">
-                        💡 {newSc <= 3
-                          ? "أضف أصناف الفاتورة مع الأسعار لترفع تقييمك إلى 10/10"
-                          : newSc <= 5
-                          ? "أضف تفاصيل الأصناف مع الكمية والسعر لترفع تقييمك"
-                          : "أكمل بيانات الأصناف (السعر والكمية) للوصول إلى 10/10"}
-                      </p>
-                    )}
-                    {newSc === 10 && oldSc < 10 && (
-                      <p className="mt-2 text-xs text-emerald-700 bg-emerald-100 rounded-xl px-3 py-1.5">
-                        🎉 ممتاز! وصلت إلى أعلى تقييم
-                      </p>
-                    )}
-                  </div>
-                );
-              })()}
             </div>
 
             {/* المحتوى القابل للتمرير */}
@@ -1040,6 +1000,46 @@ export default function ExpensesPage() {
                 </div>
               </div>
 
+              {/* ── مؤشر التقييم الحي — فوق قسم الأصناف مباشرة ── */}
+              {(() => {
+                const oldSc = editingExpense ? scoreExpense(editingExpense) : 1;
+                const newSc = computeEditScore();
+                const newLb = scoreLabel(newSc);
+                return (
+                  <div className={`rounded-2xl px-4 py-3 ${newSc >= 8 ? "bg-emerald-50 border border-emerald-100" : "bg-amber-50 border border-amber-100"}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{newLb.emoji}</span>
+                        <div>
+                          <p className="text-xs font-bold text-gray-700">تقييم جودة البيانات</p>
+                          <p className={`text-xs ${newLb.color}`}>{newLb.text}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 font-extrabold">
+                        {newSc !== oldSc && (
+                          <span className="text-gray-300 line-through text-xs">{oldSc}/10</span>
+                        )}
+                        <span className={`text-base ${newLb.color}`}>{newSc}/10</span>
+                      </div>
+                    </div>
+                    {newSc < 8 && (
+                      <p className="mt-2 text-xs text-amber-700 bg-amber-100 rounded-xl px-3 py-2">
+                        👇 {newSc <= 3
+                          ? "اضغط \"+ أضف صنف\" أدناه وأضف الأصناف مع أسعارها لترفع تقييمك إلى 10/10"
+                          : newSc <= 5
+                          ? "أكمل تفاصيل الأصناف بالكمية والسعر لترفع تقييمك"
+                          : "أكمل بيانات الأصناف (السعر والكمية) للوصول إلى 10/10"}
+                      </p>
+                    )}
+                    {newSc === 10 && oldSc < 10 && (
+                      <p className="mt-2 text-xs text-emerald-700 bg-emerald-100 rounded-xl px-3 py-2">
+                        🎉 ممتاز! وصلت إلى أعلى تقييم — جاهز للحفظ
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* الأصناف */}
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -1047,13 +1047,13 @@ export default function ExpensesPage() {
                   <button
                     type="button"
                     onClick={addItem}
-                    className="rounded-xl bg-[#1D9E75]/10 px-3 py-1 text-xs font-bold text-[#1D9E75] hover:bg-[#1D9E75]/20"
+                    className="rounded-xl bg-[#1D9E75] px-4 py-1.5 text-xs font-bold text-white shadow hover:opacity-90"
                   >+ أضف صنف</button>
                 </div>
 
                 {editItems.length === 0 && (
-                  <p className="rounded-2xl bg-gray-50 py-3 text-center text-xs text-gray-400">
-                    لا توجد أصناف — اضغط &quot;+ أضف صنف&quot; لإضافتها
+                  <p className="rounded-2xl bg-gray-50 py-4 text-center text-xs text-gray-400">
+                    لا توجد أصناف — اضغط <span className="font-bold text-[#1D9E75]">+ أضف صنف</span> لإضافتها
                   </p>
                 )}
 
