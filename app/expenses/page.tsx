@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../../lib/supabase";
 import { apiUrl } from "../../lib/api-client";
@@ -97,9 +97,19 @@ export default function ExpensesPage() {
   const [editItems, setEditItems]       = useState<EditItem[]>([]);
   const [saving, setSaving]             = useState(false);
 
+  /* ── وضع الترتيب ── */
+  const [reorderMode, setReorderMode] = useState(false);
+  const [dayOrders, setDayOrders] = useState<Record<string, string[]>>({});
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const pointerDragRef = useRef<{ id: string; dateKey: string } | null>(null);
+
   useEffect(() => {
     setUserSettings(loadSettings());
     void fetchExpenses();
+    try {
+      const raw = localStorage.getItem("fateen_expense_order");
+      if (raw) setDayOrders(JSON.parse(raw) as Record<string, string[]>);
+    } catch {}
   }, []);
 
   async function fetchExpenses() {
@@ -352,6 +362,51 @@ export default function ExpensesPage() {
 
   const allSelected = visibleExpenses.length > 0 && selected.size === visibleExpenses.length;
 
+  /* ── منطق الترتيب ── */
+  function getOrderedDayExpenses(dayExp: Expense[], dateKey: string): Expense[] {
+    const order = dayOrders[dateKey];
+    if (!order || order.length === 0) return dayExp;
+    const result: Expense[] = [];
+    order.forEach(id => { const f = dayExp.find(e => String(e.id) === id); if (f) result.push(f); });
+    dayExp.forEach(e => { if (!result.find(r => r.id === e.id)) result.push(e); });
+    return result;
+  }
+
+  function moveItemAndUpdate(dateKey: string, fromId: string, toId: string) {
+    if (fromId === toId) return;
+    const dayExp = visibleExpenses.filter(e => (e.date ?? "غير محدد") === dateKey);
+    const ordered = getOrderedDayExpenses(dayExp, dateKey);
+    const from = ordered.findIndex(e => String(e.id) === fromId);
+    const to   = ordered.findIndex(e => String(e.id) === toId);
+    if (from === -1 || to === -1) return;
+    const arr = [...ordered];
+    const [item] = arr.splice(from, 1);
+    arr.splice(to, 0, item!);
+    const newOrders = { ...dayOrders, [dateKey]: arr.map(e => String(e.id)) };
+    setDayOrders(newOrders);
+    try { localStorage.setItem("fateen_expense_order", JSON.stringify(newOrders)); } catch {}
+  }
+
+  /* تجميع المصاريف المرئية حسب اليوم */
+  const dayGroups = visibleExpenses.reduce<Record<string, Expense[]>>((acc, e) => {
+    const day = e.date ?? "غير محدد";
+    if (!acc[day]) acc[day] = [];
+    acc[day]!.push(e);
+    return acc;
+  }, {});
+  const sortedDays = Object.keys(dayGroups).sort((a, b) => b.localeCompare(a));
+
+  /* تقييم حي في نافذة التعديل */
+  function computeEditScore(): number {
+    const validItems = editItems.filter(i => i.name.trim());
+    if (validItems.length > 0) {
+      return validItems.every(i => i.unit_price > 0 && i.quantity > 0) ? 10 : 7;
+    }
+    if (editingExpense?.item_name?.trim()) return 5;
+    if (editStore.trim()) return 3;
+    return 1;
+  }
+
   /* ── نظام تقييم جودة البيانات ── */
   function scoreExpense(e: Expense): number {
     const hasItems = Array.isArray(e.items) && e.items.length > 0;
@@ -583,13 +638,24 @@ export default function ExpensesPage() {
                   <span className="text-xl">+</span> أضف مصروف
                 </Link>
                 {expenses.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={toggleSelectMode}
-                    className="rounded-2xl bg-white px-5 py-4 text-sm font-bold text-gray-500 shadow transition-opacity hover:opacity-80"
-                  >
-                    تحديد
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => { setReorderMode(r => !r); setSelectMode(false); }}
+                      className={`rounded-2xl px-4 py-4 text-sm font-bold shadow transition-all ${
+                        reorderMode ? "bg-[#1D9E75] text-white" : "bg-white text-gray-500"
+                      }`}
+                    >
+                      ⇅ ترتيب
+                    </button>
+                    <button
+                      type="button"
+                      onClick={toggleSelectMode}
+                      className="rounded-2xl bg-white px-4 py-4 text-sm font-bold text-gray-500 shadow transition-opacity hover:opacity-80"
+                    >
+                      تحديد
+                    </button>
+                  </>
                 )}
               </>
             ) : (
@@ -677,27 +743,83 @@ export default function ExpensesPage() {
               </div>
             ) : (
               <div className="space-y-3">
-              {visibleExpenses.map((expense) => {
+
+              {/* hint وضع الترتيب */}
+              {reorderMode && (
+                <div className="rounded-2xl bg-white/20 px-4 py-2.5 text-center">
+                  <p className="text-xs font-semibold text-white">اسحب ⠿ لتغيير ترتيب المصاريف بنفس اليوم</p>
+                </div>
+              )}
+
+              {(reorderMode ? sortedDays : ["_all"]).flatMap(dayKey => {
+                const dayExpenses = reorderMode
+                  ? getOrderedDayExpenses(dayGroups[dayKey] ?? [], dayKey)
+                  : visibleExpenses;
+
+                const dayHeader = reorderMode ? (
+                  <div key={`hdr-${dayKey}`} className="flex items-center gap-2 px-1 pt-1">
+                    <span className="text-xs font-bold text-white/80">📅 {formatDate(dayKey)}</span>
+                    <div className="flex-1 h-px bg-white/20" />
+                    <span className="text-xs text-white/50">{dayExpenses.length} مصروف</span>
+                  </div>
+                ) : null;
+
+                const cards = dayExpenses.map((expense) => {
                     const isSelected = selected.has(expense.id);
                     const isExpanded = expandedId === expense.id;
                     const hasItems   = Array.isArray(expense.items) && expense.items.length > 0;
                     const hasDetail  = hasItems || expense.item_name || expense.item_brand;
+                    const isDragging = draggingId === String(expense.id);
 
                     return (
                       <article
                         key={expense.id}
+                        data-drag-id={String(expense.id)}
                         className={`rounded-2xl bg-white shadow transition-all overflow-hidden ${
                           isSelected ? "ring-2 ring-[#1D9E75]" : ""
-                        } ${isExpanded ? "ring-1 ring-[#1D9E75]/30" : ""}`}
+                        } ${isExpanded ? "ring-1 ring-[#1D9E75]/30" : ""} ${
+                          isDragging ? "opacity-50 scale-[0.98] ring-2 ring-[#1D9E75]" : ""
+                        }`}
                       >
                         {/* الصف الرئيسي */}
                         <div
                           onClick={() => {
+                            if (reorderMode) return;
                             if (selectMode) { toggleItem(expense.id); return; }
                             setExpandedId(isExpanded ? null : expense.id);
                           }}
-                          className="flex cursor-pointer items-center gap-4 p-4"
+                          className={`flex items-center gap-4 p-4 ${reorderMode ? "cursor-default" : "cursor-pointer"}`}
                         >
+                          {/* مقبض السحب في وضع الترتيب */}
+                          {reorderMode && (
+                            <div
+                              className="flex-shrink-0 flex size-10 items-center justify-center rounded-xl bg-gray-50 text-gray-400 text-xl cursor-grab active:cursor-grabbing touch-none select-none"
+                              onPointerDown={(e) => {
+                                e.preventDefault();
+                                e.currentTarget.setPointerCapture(e.pointerId);
+                                pointerDragRef.current = { id: String(expense.id), dateKey: expense.date ?? "غير محدد" };
+                                setDraggingId(String(expense.id));
+                              }}
+                              onPointerMove={(e) => {
+                                if (!pointerDragRef.current) return;
+                                e.preventDefault();
+                                const card = document.querySelector(`[data-drag-id="${pointerDragRef.current.id}"]`) as HTMLElement | null;
+                                if (card) card.style.pointerEvents = "none";
+                                const under = document.elementFromPoint(e.clientX, e.clientY);
+                                const overCard = under?.closest("[data-drag-id]");
+                                const overId = overCard?.getAttribute("data-drag-id");
+                                if (card) card.style.pointerEvents = "";
+                                if (overId && overId !== pointerDragRef.current.id) {
+                                  moveItemAndUpdate(pointerDragRef.current.dateKey, pointerDragRef.current.id, overId);
+                                }
+                              }}
+                              onPointerUp={() => { pointerDragRef.current = null; setDraggingId(null); }}
+                              onPointerCancel={() => { pointerDragRef.current = null; setDraggingId(null); }}
+                            >
+                              ⠿
+                            </div>
+                          )}
+
                           {/* Checkbox */}
                           {selectMode && (
                             <div className={`flex size-6 flex-shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
@@ -814,6 +936,9 @@ export default function ExpensesPage() {
                         )}
                       </article>
                     );
+                  });
+
+                  return reorderMode ? [dayHeader, ...cards] : cards;
               })}
               </div>
             )}
@@ -843,6 +968,46 @@ export default function ExpensesPage() {
                   className="rounded-full bg-gray-100 p-2 text-gray-400 hover:bg-gray-200"
                 >✕</button>
               </div>
+
+              {/* مؤشر التقييم الحي */}
+              {(() => {
+                const oldSc = editingExpense ? scoreExpense(editingExpense) : 1;
+                const newSc = computeEditScore();
+                const newLb = scoreLabel(newSc);
+                return (
+                  <div className={`mt-3 rounded-2xl px-4 py-3 ${newSc >= 8 ? "bg-emerald-50 border border-emerald-100" : "bg-amber-50 border border-amber-100"}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{newLb.emoji}</span>
+                        <div>
+                          <p className="text-xs font-bold text-gray-700">تقييم جودة البيانات</p>
+                          <p className={`text-xs ${newLb.color}`}>{newLb.text}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-sm font-extrabold">
+                        {newSc !== oldSc && (
+                          <span className="text-gray-300 line-through text-xs">{oldSc}/10</span>
+                        )}
+                        <span className={newLb.color}>{newSc}/10</span>
+                      </div>
+                    </div>
+                    {newSc < 8 && (
+                      <p className="mt-2 text-xs text-amber-700 bg-amber-100 rounded-xl px-3 py-1.5">
+                        💡 {newSc <= 3
+                          ? "أضف أصناف الفاتورة مع الأسعار لترفع تقييمك إلى 10/10"
+                          : newSc <= 5
+                          ? "أضف تفاصيل الأصناف مع الكمية والسعر لترفع تقييمك"
+                          : "أكمل بيانات الأصناف (السعر والكمية) للوصول إلى 10/10"}
+                      </p>
+                    )}
+                    {newSc === 10 && oldSc < 10 && (
+                      <p className="mt-2 text-xs text-emerald-700 bg-emerald-100 rounded-xl px-3 py-1.5">
+                        🎉 ممتاز! وصلت إلى أعلى تقييم
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* المحتوى القابل للتمرير */}
