@@ -352,6 +352,32 @@ export default function ExpensesPage() {
 
   const allSelected = visibleExpenses.length > 0 && selected.size === visibleExpenses.length;
 
+  /* ── نظام تقييم جودة البيانات ── */
+  function scoreExpense(e: Expense): number {
+    const hasItems = Array.isArray(e.items) && e.items.length > 0;
+    if (hasItems) {
+      const fullyDetailed = e.items!.every(i => i.name?.trim() && i.unit_price > 0 && i.quantity > 0);
+      return fullyDetailed ? 10 : 7;
+    }
+    if (e.item_name?.trim()) return 5;
+    if (e.store?.trim())     return 3;
+    return 1;
+  }
+
+  function scoreLabel(score: number): { text: string; emoji: string; color: string; bar: string } {
+    if (score >= 9)  return { text: "ممتاز",   emoji: "🌟", color: "text-emerald-600", bar: "bg-emerald-500" };
+    if (score >= 7)  return { text: "جيد جداً", emoji: "👍", color: "text-green-600",   bar: "bg-green-400"   };
+    if (score >= 5)  return { text: "جيد",      emoji: "🙂", color: "text-yellow-600",  bar: "bg-yellow-400"  };
+    if (score >= 3)  return { text: "متوسط",    emoji: "😐", color: "text-orange-500",  bar: "bg-orange-400"  };
+    return               { text: "ضعيف",     emoji: "📉", color: "text-red-500",     bar: "bg-red-400"     };
+  }
+
+  const monthScoreRaw = selectedMonthExpenses.length > 0
+    ? selectedMonthExpenses.reduce((s, e) => s + scoreExpense(e), 0) / selectedMonthExpenses.length
+    : null;
+  const monthScore = monthScoreRaw !== null ? Math.round(monthScoreRaw * 10) / 10 : null;
+  const monthScoreLabel = monthScore !== null ? scoreLabel(monthScore) : null;
+
   return (
     <AuthGuard>
       <main className="min-h-screen bg-[#1D9E75] px-6 py-10 pb-28 font-sans">
@@ -435,6 +461,35 @@ export default function ExpensesPage() {
                 </div>
               )}
             </div>
+
+            {/* ── تقييم جودة البيانات الشهري ── */}
+            {!loading && monthScore !== null && monthScoreLabel && (
+              <div className="mt-4 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{monthScoreLabel.emoji}</span>
+                    <div>
+                      <p className="text-xs font-bold text-gray-600">جودة تفاصيل المصاريف</p>
+                      <p className={`text-xs font-semibold ${monthScoreLabel.color}`}>{monthScoreLabel.text}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className={`text-2xl font-extrabold ${monthScoreLabel.color}`}>{monthScore.toFixed(1)}</span>
+                    <span className="text-xs text-gray-400 font-semibold">/10</span>
+                  </div>
+                </div>
+                {/* شريط التقييم */}
+                <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
+                  <div
+                    className={`h-2 rounded-full transition-all duration-500 ${monthScoreLabel.bar}`}
+                    style={{ width: `${(monthScore / 10) * 100}%` }}
+                  />
+                </div>
+                <p className="mt-1.5 text-xs text-gray-400">
+                  {selectedMonthExpenses.filter(e => Array.isArray(e.items) && e.items.length > 0).length} من {selectedMonthExpenses.length} فاتورة بتفاصيل كاملة
+                </p>
+              </div>
+            )}
 
             {/* ملخص التصنيفات */}
             {sortedCategories.length > 0 && (
@@ -674,12 +729,22 @@ export default function ExpensesPage() {
                             </p>
                           </div>
 
-                          {/* Amount + expand indicator */}
+                          {/* Amount + score badge + expand indicator */}
                           <div className="flex flex-shrink-0 flex-col items-end gap-1">
                             <p className="text-lg font-extrabold text-[#1D9E75]">
                               {toNumber(expense.amount).toFixed(2)}
                               <span className="mr-0.5 text-xs font-normal text-gray-400">ر.س</span>
                             </p>
+                            {/* شارة التقييم الصغيرة */}
+                            {!selectMode && (() => {
+                              const sc = scoreExpense(expense);
+                              const lb = scoreLabel(sc);
+                              return (
+                                <span className={`text-xs font-bold ${lb.color}`}>
+                                  {sc}/10
+                                </span>
+                              );
+                            })()}
                             {!selectMode && (
                               <span className={`text-xs text-gray-300 transition-transform ${isExpanded ? "rotate-180" : ""}`}>
                                 {hasDetail ? "▼" : "·"}
