@@ -71,6 +71,9 @@ export default function ExpensesPage() {
   /* فلتر التصنيف */
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
 
+  /* البحث */
+  const [searchQuery, setSearchQuery] = useState("");
+
   /* التوسيع في المكان */
   const [expandedId, setExpandedId] = useState<number | string | null>(null);
 
@@ -321,10 +324,24 @@ export default function ExpensesPage() {
   /* مصاريف الشهر المختار */
   const selectedMonthExpenses = expenses.filter(e => getMonthKey(e.date) === selectedMonthKey);
 
-  /* المصاريف المعروضة — الشهر المختار + فلتر التصنيف */
+  /* البحث — يعمل على كل المصاريف بغض النظر عن الشهر */
+  const searchActive = searchQuery.trim().length > 0;
+  const searchResults = searchActive
+    ? expenses.filter(e => {
+        const q = searchQuery.trim().toLowerCase();
+        if ((e.store ?? "").toLowerCase().includes(q)) return true;
+        if ((e.category ?? "").toLowerCase().includes(q)) return true;
+        if ((e.item_name ?? "").toLowerCase().includes(q)) return true;
+        if (Array.isArray(e.items) && e.items.some(i => i.name?.toLowerCase().includes(q))) return true;
+        return false;
+      })
+    : null;
+
+  /* المصاريف المعروضة — بحث أو شهر + فلتر التصنيف */
+  const baseExpenses = searchResults ?? selectedMonthExpenses;
   const visibleExpenses = filterCategory
-    ? selectedMonthExpenses.filter((e) => (e.category ?? "أخرى") === filterCategory)
-    : selectedMonthExpenses;
+    ? baseExpenses.filter((e) => (e.category ?? "أخرى") === filterCategory)
+    : baseExpenses;
 
   /* إجمالي الشهر المختار */
   const currentMonthTotal = selectedMonthExpenses.reduce((s, e) => s + toNumber(e.amount), 0);
@@ -437,8 +454,28 @@ export default function ExpensesPage() {
               <h1 className="text-3xl font-extrabold text-[#1D9E75]">مصاريفي</h1>
             </div>
 
-            {/* تنقل بين الأشهر */}
-            {!loading && allMonthKeys.length > 0 && (
+            {/* صندوق البحث */}
+            <div className="mt-4 relative">
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 text-lg pointer-events-none">🔍</span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => { setSearchQuery(e.target.value); setFilterCategory(null); }}
+                placeholder="ابحث عن محل، صنف، أو تصنيف..."
+                className="w-full rounded-2xl border border-gray-100 bg-gray-50 py-3 pr-9 pl-10 text-sm text-gray-700 outline-none focus:border-[#1D9E75] focus:ring-1 focus:ring-[#1D9E75]/30 placeholder-gray-300"
+                dir="rtl"
+              />
+              {searchQuery.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 flex size-6 items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors text-xs"
+                >✕</button>
+              )}
+            </div>
+
+            {/* تنقل بين الأشهر — مخفي لما البحث نشط */}
+            {!loading && allMonthKeys.length > 0 && !searchActive && (
               <div className="mt-4 flex items-center gap-2 rounded-2xl bg-[#1D9E75]/5 px-2 py-2">
                 {/* الشهر السابق (أقدم) */}
                 <button
@@ -473,20 +510,34 @@ export default function ExpensesPage() {
 
             <div className="mt-3 rounded-2xl bg-[#1D9E75]/5 p-4 space-y-3">
               <div>
-                <p className="text-xs font-medium text-gray-500">
-                  {selectedMonthKey === currentMonthKey ? "إجمالي الفترة الحالية" : `إجمالي ${monthKeyLabel(selectedMonthKey)}`}
-                  {selectedMonthKey === currentMonthKey && userSettings.startDay !== 1 && (
-                    <span className="mr-1 text-gray-400">(منذ {userSettings.startDay} الشهر)</span>
-                  )}
-                </p>
-                <p className="mt-1 text-4xl font-extrabold text-[#1D9E75]">
-                  {currentMonthTotal.toFixed(2)}
-                  <span className="mr-1 text-lg font-semibold text-gray-400">ر.س</span>
-                </p>
+                {searchActive ? (
+                  <>
+                    <p className="text-xs font-medium text-gray-500">نتائج البحث عن "{searchQuery.trim()}"</p>
+                    <p className="mt-1 text-2xl font-extrabold text-[#1D9E75]">
+                      {visibleExpenses.length} نتيجة
+                      <span className="mr-2 text-base font-semibold text-gray-400">
+                        · {visibleExpenses.reduce((s, e) => s + toNumber(e.amount), 0).toFixed(2)} ر.س
+                      </span>
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs font-medium text-gray-500">
+                      {selectedMonthKey === currentMonthKey ? "إجمالي الفترة الحالية" : `إجمالي ${monthKeyLabel(selectedMonthKey)}`}
+                      {selectedMonthKey === currentMonthKey && userSettings.startDay !== 1 && (
+                        <span className="mr-1 text-gray-400">(منذ {userSettings.startDay} الشهر)</span>
+                      )}
+                    </p>
+                    <p className="mt-1 text-4xl font-extrabold text-[#1D9E75]">
+                      {currentMonthTotal.toFixed(2)}
+                      <span className="mr-1 text-lg font-semibold text-gray-400">ر.س</span>
+                    </p>
+                  </>
+                )}
               </div>
 
               {/* شريط الميزانية */}
-              {remaining !== null && (
+              {remaining !== null && !searchActive && (
                 <div className="border-t border-[#1D9E75]/10 pt-3 space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-500">الميزانية: {userSettings.budget.toLocaleString()} ر.س</span>
@@ -511,7 +562,7 @@ export default function ExpensesPage() {
             </div>
 
             {/* ── تقييم جودة البيانات الشهري ── */}
-            {!loading && monthScore !== null && monthScoreLabel && (
+            {!loading && monthScore !== null && monthScoreLabel && !searchActive && (
               <div className="mt-4 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -703,10 +754,12 @@ export default function ExpensesPage() {
               <div className="rounded-2xl bg-white p-8 text-center shadow">
                 <p className="text-4xl">🧾</p>
                 <p className="mt-3 font-semibold text-gray-600">
-                  {filterCategory ? `لا توجد مصاريف في ${filterCategory}` : "لا توجد مصاريف حتى الآن"}
+                  {searchActive
+                    ? `ما لقينا نتائج لـ "${searchQuery.trim()}"`
+                    : filterCategory ? `لا توجد مصاريف في ${filterCategory}` : "لا توجد مصاريف حتى الآن"}
                 </p>
                 <p className="mt-1 text-sm text-gray-400">
-                  {filterCategory ? "" : "ارفع أول فاتورة وابدأ التتبع"}
+                  {searchActive ? "جرب كلمة مختلفة" : filterCategory ? "" : "ارفع أول فاتورة وابدأ التتبع"}
                 </p>
               </div>
             ) : (
