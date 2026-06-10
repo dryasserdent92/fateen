@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: "/expenses", icon: "🧾", label: "المصاريف" },
   { href: "/add",      icon: null,  label: "إضافة"    }, /* زر الإضافة المركزي */
   { href: "/smart",    icon: "🧠", label: "فطين"      },
+  { href: "/reports",  icon: "📊", label: "التقارير"  },
   { href: "/settings", icon: "⚙️", label: "الإعدادات" },
 ] as const;
 
@@ -17,7 +18,7 @@ export default function BottomNav() {
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.07)]">
       {/* pb يأخذ زر الرئيسية في iPhone X+ بعين الاعتبار */}
-      <div className="mx-auto flex max-w-xl items-end justify-around px-2 pt-1 bottom-nav-ios" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 4px)" }}>
+      <div className="mx-auto flex max-w-xl items-end justify-around px-1 pt-1 bottom-nav-ios" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 4px)" }}>
         {NAV_ITEMS.map((item) => {
           /* زر الإضافة المركزي */
           if (item.icon === null) {
@@ -43,11 +44,11 @@ export default function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center gap-1 px-3 py-2 transition-opacity ${
+              className={`flex flex-col items-center gap-0.5 px-2 py-2 transition-opacity ${
                 isActive ? "opacity-100" : "opacity-40 hover:opacity-70"
               }`}
             >
-              <span className={`text-2xl leading-none transition-transform ${isActive ? "scale-110" : ""}`}>
+              <span className={`text-xl leading-none transition-transform ${isActive ? "scale-110" : ""}`}>
                 {item.icon}
               </span>
               <span className={`text-[10px] font-bold ${isActive ? "text-[#1D9E75]" : "text-gray-500"}`}>
