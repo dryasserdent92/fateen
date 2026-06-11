@@ -72,9 +72,11 @@ type CompareResult = {
   comparable: boolean;
   item1_unit_count: number | null;
   item2_unit_count: number | null;
+  item3_unit_count: number | null;
   item1_price_per_unit: number | null;
   item2_price_per_unit: number | null;
-  winner: 1 | 2 | null;
+  item3_price_per_unit: number | null;
+  winner: 1 | 2 | 3 | null;
   savings_percent: number | null;
   unit_label: string | null;
   message: string;
@@ -247,9 +249,11 @@ export default function SmartPage() {
   /* تاب المقارنة */
   const [slot1, setSlot1] = useState<SelectableItem | null>(null);
   const [slot2, setSlot2] = useState<SelectableItem | null>(null);
+  const [slot3, setSlot3] = useState<SelectableItem | null>(null);
   const [search1, setSearch1] = useState("");
   const [search2, setSearch2] = useState("");
-  const [activeSlot, setActiveSlot] = useState<1 | 2 | null>(null);
+  const [search3, setSearch3] = useState("");
+  const [activeSlot, setActiveSlot] = useState<1 | 2 | 3 | null>(null);
   const [compareResult, setCompareResult] = useState<CompareResult | null>(null);
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [compareError, setCompareError] = useState<string | null>(null);
@@ -294,7 +298,7 @@ export default function SmartPage() {
     finally { setLoadingAdvice(false); }
   }
 
-  /* مقارنة الصنفين */
+  /* مقارنة الأصناف */
   async function runCompare() {
     if (!slot1 || !slot2 || loadingCompare) return;
     setLoadingCompare(true); setCompareError(null); setCompareResult(null);
@@ -304,7 +308,7 @@ export default function SmartPage() {
         ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) };
       const res = await fetch(apiUrl("/api/compare"), {
         method: "POST", headers,
-        body: JSON.stringify({ item1: slot1, item2: slot2 }),
+        body: JSON.stringify({ item1: slot1, item2: slot2, item3: slot3 ?? null }),
       });
       if (!res.ok) { const e = (await res.json()) as { error?: string }; throw new Error(e.error ?? "خطأ"); }
       const json = (await res.json()) as CompareResult;
@@ -314,16 +318,19 @@ export default function SmartPage() {
   }
 
   /* فلترة البحث */
-  const filtered1 = search1.trim().length > 0
-    ? selectableItems.filter(i => i.name.includes(search1.trim()) || (i.store ?? "").includes(search1.trim()))
-    : [];
-  const filtered2 = search2.trim().length > 0
-    ? selectableItems.filter(i => i.name.includes(search2.trim()) || (i.store ?? "").includes(search2.trim()))
-    : [];
+  const filterItems = (q: string) =>
+    q.trim().length > 0
+      ? selectableItems.filter(i => i.name.includes(q.trim()) || (i.store ?? "").includes(q.trim()))
+      : [];
+  const filtered1 = filterItems(search1);
+  const filtered2 = filterItems(search2);
+  const filtered3 = filterItems(search3);
 
-  function selectForSlot(item: SelectableItem, slot: 1 | 2) {
-    if (slot === 1) { setSlot1(item); setSearch1(""); setActiveSlot(null); }
-    else { setSlot2(item); setSearch2(""); setActiveSlot(null); }
+  function selectForSlot(item: SelectableItem, slot: 1 | 2 | 3) {
+    if (slot === 1) { setSlot1(item); setSearch1(""); }
+    else if (slot === 2) { setSlot2(item); setSearch2(""); }
+    else { setSlot3(item); setSearch3(""); }
+    setActiveSlot(null);
     setCompareResult(null);
     setCompareError(null);
   }
@@ -374,7 +381,7 @@ export default function SmartPage() {
                   : "text-white/50 hover:text-white/80"
               }`}
             >
-              ⚖️ قارن صنفين
+              ⚖️ قارن الأصناف
             </button>
           </div>
         </div>
@@ -472,12 +479,12 @@ export default function SmartPage() {
           </div>
         )}
 
-        {/* ════════════ تاب: قارن صنفين ════════════ */}
+        {/* ════════════ تاب: قارن الأصناف ════════════ */}
         {activeTab === "compare" && (
           <div className="px-4 space-y-4 mx-auto max-w-xl">
 
             <p className="px-1 text-xs text-white/40">
-              ابحث عن صنفين من مشترياتك واختر كل واحد، ثم اضغط "قارن" وعمار يحسب لك الأفضل قيمةً للريال
+              اختر صنفين أو ثلاثة من مشترياتك وعمار يحسب لك الأفضل قيمةً للريال بسعر الوحدة
             </p>
 
             {/* ── الصنف الأول ── */}
@@ -506,6 +513,46 @@ export default function SmartPage() {
               onClear={() => { setSlot2(null); setSearch2(""); setCompareResult(null); }}
             />
 
+            {/* ── الصنف الثالث (اختياري) ── */}
+            <div className="space-y-2">
+              {slot3 ? (
+                <ItemSlot
+                  slotNumber={3}
+                  selected={slot3}
+                  search={search3}
+                  onSearchChange={(v) => { setSearch3(v); setActiveSlot(3); if (!v) setActiveSlot(null); }}
+                  onFocus={() => setActiveSlot(3)}
+                  isActive={activeSlot === 3}
+                  results={filtered3}
+                  onSelect={(item) => selectForSlot(item, 3)}
+                  onClear={() => { setSlot3(null); setSearch3(""); setCompareResult(null); }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setSearch3(""); setActiveSlot(3); setSlot3(null); }}
+                  className="w-full flex items-center justify-center gap-2 rounded-2xl border border-dashed border-white/20 bg-white/4 py-3 text-sm text-white/40 hover:border-white/40 hover:text-white/60 transition-all"
+                >
+                  <span className="text-lg">＋</span>
+                  <span>أضف صنفاً ثالثاً (اختياري)</span>
+                </button>
+              )}
+              {/* مربع بحث الصنف الثالث لما يضغط الزر ولم يُختر بعد */}
+              {!slot3 && activeSlot === 3 && (
+                <ItemSlot
+                  slotNumber={3}
+                  selected={null}
+                  search={search3}
+                  onSearchChange={(v) => { setSearch3(v); }}
+                  onFocus={() => setActiveSlot(3)}
+                  isActive={true}
+                  results={filtered3}
+                  onSelect={(item) => selectForSlot(item, 3)}
+                  onClear={() => { setSearch3(""); setActiveSlot(null); }}
+                />
+              )}
+            </div>
+
             {/* ── زر القارن ── */}
             <button
               type="button"
@@ -518,7 +565,7 @@ export default function SmartPage() {
                   <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                   عمار يحسب...
                 </span>
-              ) : "⚖️ قارن الصنفين"}
+              ) : slot3 ? "⚖️ قارن الأصناف الثلاثة" : "⚖️ قارن الصنفين"}
             </button>
 
             {/* ── خطأ ── */}
@@ -530,7 +577,7 @@ export default function SmartPage() {
 
             {/* ── نتيجة المقارنة ── */}
             {compareResult && slot1 && slot2 && (
-              <CompareResultCard result={compareResult} item1={slot1} item2={slot2} />
+              <CompareResultCard result={compareResult} item1={slot1} item2={slot2} item3={slot3} />
             )}
 
             {/* placeholder لو ما في أصناف بعد */}
@@ -571,7 +618,7 @@ function ItemSlot({
   slotNumber, selected, search, onSearchChange, onFocus,
   isActive, results, onSelect, onClear,
 }: {
-  slotNumber: 1 | 2;
+  slotNumber: 1 | 2 | 3;
   selected: SelectableItem | null;
   search: string;
   onSearchChange: (v: string) => void;
@@ -582,15 +629,21 @@ function ItemSlot({
   onClear: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const slotColors = [
+    "bg-violet-500/30 text-violet-300",
+    "bg-amber-500/30 text-amber-300",
+    "bg-sky-500/30 text-sky-300",
+  ] as const;
+  const slotNames = ["الأول", "الثاني", "الثالث"] as const;
 
   return (
     <div className="rounded-2xl bg-white/8 border border-white/10 overflow-visible">
       {/* رأس المربع */}
       <div className="flex items-center gap-2 px-4 pt-3 pb-2">
-        <span className={`flex size-6 items-center justify-center rounded-full text-xs font-extrabold ${
-          slotNumber === 1 ? "bg-violet-500/30 text-violet-300" : "bg-amber-500/30 text-amber-300"
-        }`}>{slotNumber}</span>
-        <span className="text-xs font-bold text-white/60">الصنف {slotNumber === 1 ? "الأول" : "الثاني"}</span>
+        <span className={`flex size-6 items-center justify-center rounded-full text-xs font-extrabold ${slotColors[slotNumber - 1]}`}>
+          {slotNumber}
+        </span>
+        <span className="text-xs font-bold text-white/60">الصنف {slotNames[slotNumber - 1]}</span>
         {selected && (
           <button type="button" onClick={onClear}
             className="mr-auto text-xs text-white/30 hover:text-red-400 transition-colors">
@@ -664,16 +717,12 @@ function ItemSlot({
 }
 
 /* ── نتيجة المقارنة ── */
-function CompareResultCard({ result, item1, item2 }: {
+function CompareResultCard({ result, item1, item2, item3 }: {
   result: CompareResult;
   item1: SelectableItem;
   item2: SelectableItem;
+  item3: SelectableItem | null;
 }) {
-  const winnerItem = result.winner === 1 ? item1 : result.winner === 2 ? item2 : null;
-  const loserItem = result.winner === 1 ? item2 : result.winner === 2 ? item1 : null;
-  const winnerUnitPrice = result.winner === 1 ? result.item1_price_per_unit : result.item2_price_per_unit;
-  const loserUnitPrice = result.winner === 1 ? result.item2_price_per_unit : result.item1_price_per_unit;
-
   if (!result.comparable) {
     return (
       <div className="rounded-3xl bg-amber-500/10 border border-amber-500/25 p-5 text-center space-y-3">
@@ -684,30 +733,48 @@ function CompareResultCard({ result, item1, item2 }: {
     );
   }
 
+  const slots = [
+    { item: item1, price_per_unit: result.item1_price_per_unit, isWinner: result.winner === 1 },
+    { item: item2, price_per_unit: result.item2_price_per_unit, isWinner: result.winner === 2 },
+    ...(item3 && result.item3_price_per_unit !== null
+      ? [{ item: item3, price_per_unit: result.item3_price_per_unit, isWinner: result.winner === 3 }]
+      : []),
+  ].filter(s => s.price_per_unit !== null);
+
+  /* رتّب من الأرخص للأغلى */
+  const sorted = [...slots].sort((a, b) => (a.price_per_unit ?? 0) - (b.price_per_unit ?? 0));
+
   return (
     <div className="rounded-3xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/25 p-5 space-y-4">
       <div className="flex items-center gap-2">
         <div className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-lg">🧙</div>
         <p className="text-sm font-extrabold text-white">نتيجة المقارنة</p>
+        {item3 && <span className="mr-auto rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-bold text-sky-300">3 أصناف</span>}
       </div>
 
-      {/* المقارنة المرئية */}
-      {result.item1_price_per_unit !== null && result.item2_price_per_unit !== null && result.unit_label && (
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { item: item1, price_per_unit: result.item1_price_per_unit, isWinner: result.winner === 1 },
-            { item: item2, price_per_unit: result.item2_price_per_unit, isWinner: result.winner === 2 },
-          ].map(({ item, price_per_unit, isWinner }, idx) => (
-            <div key={idx} className={`rounded-2xl p-3 text-center space-y-1 ${
+      {/* المقارنة المرئية — مرتّبة */}
+      {result.unit_label && slots.length > 0 && (
+        <div className={`grid gap-3 ${slots.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+          {sorted.map(({ item, price_per_unit, isWinner }, idx) => (
+            <div key={item.uid} className={`rounded-2xl p-3 text-center space-y-1 ${
               isWinner
                 ? "bg-emerald-500/20 border border-emerald-500/40 ring-1 ring-emerald-400/30"
                 : "bg-white/5 border border-white/10"
             }`}>
-              {isWinner && <p className="text-xs font-bold text-emerald-400">🏆 الأفضل قيمةً</p>}
-              <p className="text-xs font-semibold text-white/70 leading-snug truncate">{item.name}</p>
-              {item.store && <p className="text-[10px] text-white/40">{item.store}</p>}
-              <p className={`text-xl font-extrabold tabular-nums ${isWinner ? "text-emerald-300" : "text-white/60"}`}>
-                {price_per_unit.toFixed(2)}
+              {idx === 0 && <p className="text-[10px] font-bold text-emerald-400">🏆 الأفضل</p>}
+              {idx === 1 && slots.length === 3 && <p className="text-[10px] font-bold text-amber-400">🥈 الثاني</p>}
+              {idx === slots.length - 1 && slots.length > 1 && !isWinner && (
+                <p className="text-[10px] text-white/30">الأغلى</p>
+              )}
+              <p className="text-xs font-semibold text-white/70 leading-snug" style={{
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}>{item.name}</p>
+              {item.store && <p className="text-[10px] text-white/40 truncate">{item.store}</p>}
+              <p className={`text-xl font-extrabold tabular-nums ${isWinner ? "text-emerald-300" : idx === 1 && slots.length === 3 ? "text-amber-300" : "text-white/60"}`}>
+                {price_per_unit!.toFixed(2)}
               </p>
               <p className="text-[10px] text-white/40">ر.س / {result.unit_label}</p>
             </div>
@@ -721,10 +788,10 @@ function CompareResultCard({ result, item1, item2 }: {
       </div>
 
       {/* ملخص التوفير */}
-      {result.savings_percent !== null && result.savings_percent > 0 && winnerItem && loserItem && (
+      {result.savings_percent !== null && result.savings_percent > 0 && (
         <div className="flex items-center justify-between rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-xs">
-          <span className="text-white/50">الفرق في السعر للوحدة</span>
-          <span className="font-extrabold text-emerald-300">{result.savings_percent.toFixed(0)}% أرخص</span>
+          <span className="text-white/50">التوفير مقارنةً بالأغلى</span>
+          <span className="font-extrabold text-emerald-300">{result.savings_percent.toFixed(0)}% أرخص 💰</span>
         </div>
       )}
     </div>

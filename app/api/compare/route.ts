@@ -5,22 +5,32 @@ type ItemInput = {
   name: string;
   brand: string | null;
   unit_price: number;
-  quantity: number; // عدد العبوات المشتراة
+  quantity: number;
   store: string | null;
   date: string | null;
 };
 
 type CompareResult = {
   comparable: boolean;
-  item1_unit_count: number | null;   // عدد القطع داخل العبوة
+  item1_unit_count: number | null;
   item2_unit_count: number | null;
+  item3_unit_count: number | null;
   item1_price_per_unit: number | null;
   item2_price_per_unit: number | null;
-  winner: 1 | 2 | null;             // الأفضل قيمةً
-  savings_percent: number | null;    // نسبة التوفير
-  unit_label: string | null;         // "حبة" / "مل" / "غرام" ...
+  item3_price_per_unit: number | null;
+  winner: 1 | 2 | 3 | null;
+  savings_percent: number | null;
+  unit_label: string | null;
   message: string;
 };
+
+function buildItemBlock(item: ItemInput, idx: number): string {
+  return `الصنف ${idx === 1 ? "الأول" : idx === 2 ? "الثاني" : "الثالث"}:
+- الاسم: ${item.name}${item.brand ? ` (${item.brand})` : ""}
+- السعر: ${item.unit_price.toFixed(2)} ريال للعبوة
+- العدد المشترى: ${item.quantity} عبوة
+- المتجر: ${item.store ?? "غير محدد"}`;
+}
 
 export async function POST(req: NextRequest) {
   const userId = await getUserIdFromRequest(req);
@@ -33,42 +43,47 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No ANTHROPIC_API_KEY" }, { status: 500 });
   }
 
-  const body = (await req.json()) as { item1: ItemInput; item2: ItemInput };
-  const { item1, item2 } = body;
+  const body = (await req.json()) as { item1: ItemInput; item2: ItemInput; item3?: ItemInput | null };
+  const { item1, item2, item3 } = body;
+  const hasThree = !!item3;
 
-  const prompt = `أنت "عمار" مستشار مالي ذكي وعملي للمستهلك السعودي. مهمتك مقارنة صنفين من مشتريات المستخدم وتحديد الأفضل قيمةً للمال.
+  const itemsBlock = [
+    buildItemBlock(item1, 1),
+    buildItemBlock(item2, 2),
+    ...(hasThree ? [buildItemBlock(item3!, 3)] : []),
+  ].join("\n\n");
 
-الصنف الأول:
-- الاسم: ${item1.name}${item1.brand ? ` (${item1.brand})` : ""}
-- السعر: ${item1.unit_price.toFixed(2)} ريال للعبوة
-- العدد المشترى: ${item1.quantity} عبوة
-- المتجر: ${item1.store ?? "غير محدد"}
+  const winnerNote = hasThree
+    ? `"winner": 1 أو 2 أو 3 أو null`
+    : `"winner": 1 أو 2 أو null`;
 
-الصنف الثاني:
-- الاسم: ${item2.name}${item2.brand ? ` (${item2.brand})` : ""}
-- السعر: ${item2.unit_price.toFixed(2)} ريال للعبوة
-- العدد المشترى: ${item2.quantity} عبوة
-- المتجر: ${item2.store ?? "غير محدد"}
+  const item3Fields = hasThree ? `
+  "item3_unit_count": رقم أو null,
+  "item3_price_per_unit": رقم أو null,` : `
+  "item3_unit_count": null,
+  "item3_price_per_unit": null,`;
+
+  const prompt = `أنت "عمار" مستشار مالي ذكي وعملي للمستهلك السعودي. مهمتك مقارنة ${hasThree ? "ثلاثة أصناف" : "صنفين"} من مشتريات المستخدم وتحديد الأفضل قيمةً للمال.
+
+${itemsBlock}
 
 المطلوب:
 1. حدد إذا كانت المقارنة منطقية (نفس النوع من المنتج — مثلاً حفائظ مقابل حفائظ، عصير مقابل عصير).
 2. إذا كانت منطقية: استخرج عدد الوحدات داخل كل عبوة من الاسم (مثل "60 حبة" = 60، "1 لتر" = 1000 مل، "500 غرام" = 500).
 3. احسب سعر الوحدة الواحدة لكل صنف.
 4. حدد الأفضل قيمةً للمال.
-5. احسب نسبة التوفير لو اشترى دايماً الأرخص.
+5. احسب نسبة التوفير لو اشترى دايماً الأرخص مقارنةً بالأغلى.
 
 أرجع JSON صحيح فقط — بدون أي نص قبله أو بعده:
 
 {
   "comparable": true أو false,
   "item1_unit_count": رقم أو null,
-  "item2_unit_count": رقم أو null,
-  "item1_price_per_unit": رقم أو null,
-  "item2_price_per_unit": رقم أو null,
-  "winner": 1 أو 2 أو null,
+  "item2_unit_count": رقم أو null,${item3Fields}
+  ${winnerNote},
   "savings_percent": رقم أو null,
   "unit_label": "حبة" أو "مل" أو "غرام" أو غيرها أو null,
-  "message": "رسالة عمار للمستخدم بالعربي السعودي — إذا comparable=false اكتب رسالة طريفة تقول المقارنة ما تجي مثل: يالحبيب المقارنة هذي ما تجي، شايش تقارن X بـY؟ خلك فطين وقارن نفس النوع — إذا comparable=true اكتب تحليلاً مختصراً ومفيداً يبين الأفضل قيمةً مع ذكر السعر لكل وحدة والمبلغ الموفر لو دايماً يشتري الأرخص"
+  "message": "رسالة عمار للمستخدم بالعربي السعودي — إذا comparable=false اكتب رسالة طريفة تقول المقارنة ما تجي — إذا comparable=true اكتب تحليلاً مختصراً يبين الترتيب من الأرخص للأغلى بسعر الوحدة، والتوفير الكلي لو دايماً يشتري الأفضل"
 }`;
 
   try {
@@ -81,7 +96,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 600,
+        max_tokens: 700,
         messages: [{ role: "user", content: prompt }],
       }),
     });
