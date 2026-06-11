@@ -6,6 +6,7 @@ import { supabase } from "../../lib/supabase";
 import AuthGuard from "../components/auth-guard";
 import BottomNav from "../components/bottom-nav";
 import { loadSettings, saveSettings, type CustomCategory } from "../../lib/user-settings";
+import { CHANGELOG } from "../../lib/changelog";
 
 const EMOJI_PRESETS = ["🏠","🎓","✈️","🎮","🐾","💼","🍕","🎵","📚","🎨","🔧","💇","🎁","🏖️","💊","☎️","🧴","🛁","⚽","🌿"];
 
@@ -251,6 +252,58 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between py-2">
               <span className="text-sm font-semibold text-gray-700">👨‍💻 تصميم وتطوير</span>
               <span className="text-sm font-bold text-[#1D9E75]">ياسر المنجم</span>
+            </div>
+          </div>
+
+          {/* ── سجل التحديثات ── */}
+          <div className="rounded-3xl bg-white p-5 shadow-lg space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <p className="text-xs font-bold text-gray-400">📋 سجل التحديثات</p>
+              <span className="rounded-full bg-[#1D9E75]/10 px-2 py-0.5 text-xs font-bold text-[#1D9E75]">
+                آخر تحديث: {CHANGELOG[0]?.date} {CHANGELOG[0]?.time}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {CHANGELOG.map((entry, idx) => (
+                <div key={idx} className={`rounded-2xl p-4 space-y-2 ${
+                  idx === 0 ? "bg-[#1D9E75]/5 border border-[#1D9E75]/20" : "bg-gray-50"
+                }`}>
+                  {/* رأس التحديث */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        entry.type === "feature"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : entry.type === "fix"
+                          ? "bg-red-100 text-red-600"
+                          : "bg-blue-100 text-blue-700"
+                      }`}>
+                        {entry.type === "feature" ? "✨ جديد" : entry.type === "fix" ? "🔧 إصلاح" : "⚡ تحسين"}
+                      </span>
+                      {idx === 0 && (
+                        <span className="rounded-full bg-[#1D9E75] px-2 py-0.5 text-[10px] font-bold text-white">
+                          الأحدث
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-gray-400 flex-shrink-0 tabular-nums">
+                      {entry.date} · {entry.time}
+                    </span>
+                  </div>
+
+                  <p className="text-sm font-extrabold text-gray-800">{entry.title}</p>
+
+                  <ul className="space-y-1">
+                    {entry.items.map((item, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
+                        <span className="flex-shrink-0 mt-0.5 text-[#1D9E75]">•</span>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
           </div>
 
