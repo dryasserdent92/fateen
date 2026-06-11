@@ -186,15 +186,22 @@ function buildSelectableItems(expenses: ExpenseRow[]): SelectableItem[] {
     /* أصناف من items array */
     if (Array.isArray(exp.items) && exp.items.length > 0) {
       for (const item of exp.items) {
-        if (!item.name?.trim() || item.unit_price <= 0) continue;
-        const key = `${normalizeName(item.name)}__${item.unit_price.toFixed(2)}__${exp.store ?? ""}`;
+        if (!item.name?.trim()) continue;
+        /* المفتاح يشمل id الفاتورة لتجنب دمج أصناف مختلفة بنفس الاسم والسعر */
+        const key = `${exp.id}__${normalizeName(item.name)}`;
         if (seen.has(key)) continue;
         seen.add(key);
+        /* لو السعر صفر نرجع للمبلغ الكلي كبديل */
+        const price = toNumber(item.unit_price) > 0
+          ? toNumber(item.unit_price)
+          : toNumber(item.total_price) > 0
+          ? toNumber(item.total_price)
+          : toNumber(exp.amount);
         items.push({
           uid: `${exp.id}-${normalizeName(item.name)}`,
           name: item.name.trim(),
           brand: item.brand,
-          unit_price: toNumber(item.unit_price),
+          unit_price: price,
           quantity: Math.max(1, toNumber(item.quantity)),
           store: exp.store?.trim() || null,
           date: exp.date,
@@ -202,8 +209,8 @@ function buildSelectableItems(expenses: ExpenseRow[]): SelectableItem[] {
       }
     }
     /* صنف واحد من item_name */
-    else if (exp.item_name?.trim() && toNumber(exp.amount) > 0) {
-      const key = `${normalizeName(exp.item_name)}__${toNumber(exp.amount).toFixed(2)}__${exp.store ?? ""}`;
+    else if (exp.item_name?.trim()) {
+      const key = `${exp.id}__single`;
       if (!seen.has(key)) {
         seen.add(key);
         items.push({
