@@ -235,6 +235,24 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* شارك التطبيق */}
+          <div className="rounded-3xl bg-gradient-to-l from-[#1D9E75] to-[#0f7a57] p-5 shadow-lg">
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-1">
+                <p className="text-base font-extrabold text-white">شارك فطين مع صديق 🚀</p>
+                <p className="text-xs text-white/70">شوف كل مزايا التطبيق في صفحة واحدة</p>
+              </div>
+              <a
+                href="/marketing.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-shrink-0 rounded-2xl bg-white px-4 py-2.5 text-sm font-extrabold text-[#1D9E75] shadow transition-opacity hover:opacity-90 active:scale-95"
+              >
+                عرض الصفحة ↗
+              </a>
+            </div>
+          </div>
+
           {/* App info */}
           <div className="rounded-3xl bg-white p-5 shadow-lg space-y-4">
             <p className="text-xs font-bold text-gray-400 px-1">حول فطين</p>

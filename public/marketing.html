@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>فطين — تطبيق المصاريف الذكي</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green: #1D9E75;
+      --green-light: #e8f7f2;
+      --green-dark: #157a5a;
+      --yellow: #fbbf24;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-400: #9ca3af;
+      --gray-600: #4b5563;
+      --gray-800: #1f2937;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Tajawal', 'Segoe UI', sans-serif;
+      background: #fff;
+      color: var(--gray-800);
+      overflow-x: hidden;
+    }
+
+    /* ─── HERO ─── */
+    .hero {
+      background: linear-gradient(135deg, #0f7a57 0%, var(--green) 50%, #25c48f 100%);
+      padding: 80px 24px 100px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Ccircle cx='30' cy='30' r='20'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.25);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 6px 18px;
+      border-radius: 999px;
+      margin-bottom: 24px;
+      position: relative;
+    }
+    .hero h1 {
+      font-size: clamp(48px, 10vw, 88px);
+      font-weight: 900;
+      color: #fff;
+      line-height: 1;
+      margin-bottom: 8px;
+      position: relative;
+      letter-spacing: -1px;
+    }
+    .hero h1 span { color: #a7f3d0; }
+    .hero-tagline {
+      font-size: clamp(18px, 4vw, 26px);
+      color: rgba(255,255,255,0.9);
+      font-weight: 700;
+      margin-bottom: 16px;
+      position: relative;
+    }
+    .hero-sub {
+      font-size: 15px;
+      color: rgba(255,255,255,0.7);
+      max-width: 480px;
+      margin: 0 auto 40px;
+      line-height: 1.7;
+      position: relative;
+    }
+    .hero-phones {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      position: relative;
+      margin-top: 48px;
+    }
+    /* floating blobs */
+    .blob {
+      position: absolute;
+      border-radius: 999px;
+      opacity: 0.08;
+      background: #fff;
+      filter: blur(40px);
+    }
+    .blob-1 { width: 300px; height: 300px; top: -80px; right: -60px; }
+    .blob-2 { width: 200px; height: 200px; bottom: 0; left: -40px; }
+
+    /* ─── PHONE MOCKUP ─── */
+    .phone {
+      width: 200px;
+      background: #111;
+      border-radius: 36px;
+      padding: 12px 8px;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.08);
+      flex-shrink: 0;
+      transform: translateY(0);
+      transition: transform 0.3s;
+    }
+    .phone:hover { transform: translateY(-8px); }
+    .phone-screen {
+      background: #fff;
+      border-radius: 28px;
+      overflow: hidden;
+      aspect-ratio: 9/19;
+      position: relative;
+    }
+    .phone.hero-phone-main { transform: scale(1.1) translateY(-10px); }
+    .phone.hero-phone-main:hover { transform: scale(1.1) translateY(-18px); }
+
+    /* ─── SECTION ─── */
+    section { padding: 80px 24px; }
+    .section-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--green-light);
+      color: var(--green);
+      font-size: 13px;
+      font-weight: 800;
+      padding: 6px 16px;
+      border-radius: 999px;
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: clamp(26px, 5vw, 40px);
+      font-weight: 900;
+      color: var(--gray-800);
+      line-height: 1.2;
+      margin-bottom: 12px;
+    }
+    .section-sub {
+      font-size: 16px;
+      color: var(--gray-600);
+      line-height: 1.7;
+      max-width: 480px;
+    }
+
+    /* ─── FEATURES GRID ─── */
+    .features-intro {
+      background: var(--gray-50);
+    }
+    .features-intro-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    .features-intro-inner .section-sub { margin: 0 auto; }
+
+    .feat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 24px;
+      max-width: 1100px;
+      margin: 48px auto 0;
+    }
+    .feat-card {
+      background: #fff;
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.06);
+      border: 1px solid var(--gray-100);
+      transition: transform 0.25s, box-shadow 0.25s;
+    }
+    .feat-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 40px rgba(29,158,117,0.12);
+    }
+    .feat-icon {
+      font-size: 36px;
+      margin-bottom: 16px;
+      display: block;
+    }
+    .feat-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--gray-800);
+      margin-bottom: 8px;
+    }
+    .feat-desc {
+      font-size: 14px;
+      color: var(--gray-600);
+      line-height: 1.7;
+    }
+    .feat-tag {
+      display: inline-block;
+      margin-top: 12px;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: var(--green-light);
+      color: var(--green-dark);
+    }
+
+    /* ─── FEATURE SHOWCASE (alternating) ─── */
+    .showcase {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .showcase-row {
+      display: flex;
+      align-items: center;
+      gap: 60px;
+      padding: 60px 0;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .showcase-row:last-child { border-bottom: none; }
+    .showcase-row.reverse { flex-direction: row-reverse; }
+    .showcase-text { flex: 1; min-width: 0; }
+    .showcase-visual { flex-shrink: 0; }
+    .showcase-phones {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    .showcase-phones .phone { width: 160px; }
+    .showcase-phones .phone:first-child { transform: translateY(-20px) rotate(-3deg); }
+    .showcase-phones .phone:first-child:hover { transform: translateY(-28px) rotate(-3deg); }
+    .showcase-phones .phone:last-child { transform: rotate(3deg); }
+    .showcase-phones .phone:last-child:hover { transform: translateY(-8px) rotate(3deg); }
+
+    .showcase-bullets {
+      list-style: none;
+      margin-top: 20px;
+      space-y: 8px;
+    }
+    .showcase-bullets li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 15px;
+      color: var(--gray-600);
+      padding: 6px 0;
+      line-height: 1.5;
+    }
+    .showcase-bullets li::before {
+      content: '✓';
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      background: var(--green-light);
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 900;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ─── STATS ─── */
+    .stats-band {
+      background: linear-gradient(135deg, var(--green-dark), var(--green));
+      padding: 60px 24px;
+      text-align: center;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 40px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .stat-num {
+      font-size: 48px;
+      font-weight: 900;
+      color: #fff;
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 14px;
+      color: rgba(255,255,255,0.75);
+      margin-top: 6px;
+      font-weight: 600;
+    }
+
+    /* ─── CTA ─── */
+    .cta-band {
+      background: var(--gray-50);
+      text-align: center;
+      padding: 80px 24px;
+    }
+    .cta-band h2 {
+      font-size: clamp(28px, 5vw, 44px);
+      font-weight: 900;
+      margin-bottom: 12px;
+      color: var(--gray-800);
+    }
+    .cta-band p {
+      font-size: 16px;
+      color: var(--gray-600);
+      max-width: 400px;
+      margin: 0 auto 32px;
+      line-height: 1.7;
+    }
+    .btn-green {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--green);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 800;
+      padding: 14px 36px;
+      border-radius: 16px;
+      text-decoration: none;
+      box-shadow: 0 4px 20px rgba(29,158,117,0.35);
+      transition: all 0.2s;
+    }
+    .btn-green:hover {
+      background: var(--green-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(29,158,117,0.45);
+    }
+
+    /* ─── FOOTER ─── */
+    footer {
+      text-align: center;
+      padding: 32px 24px;
+      font-size: 13px;
+      color: var(--gray-400);
+      border-top: 1px solid var(--gray-100);
+    }
+    footer strong { color: var(--green); }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 720px) {
+      .showcase-row, .showcase-row.reverse { flex-direction: column; gap: 32px; }
+      .showcase-visual { align-self: center; }
+      .showcase-phones .phone { width: 130px; }
+    }
+
+    /* ─── SVG SCREEN CONTENT ─── */
+    .screen-content {
+      width: 100%;
+      height: 100%;
+      font-family: 'Tajawal', sans-serif;
+    }
+
+    /* animate in on scroll */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    .fade-up.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════ HERO ══════════════════════════════ -->
+<section class="hero">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+
+  <div class="hero-badge">✨ تطبيق المصاريف الذكي</div>
+  <h1>فطين <span>🧠</span></h1>
+  <p class="hero-tagline">تتبّع مصاريفك، وفّر أموالك</p>
+  <p class="hero-sub">
+    تطبيق ذكي يقرأ فواتيرك بالكاميرا، يحلّل عاداتك الشرائية، ويوفّر لك نصائح AI لتوفير أكبر
+  </p>
+
+  <div class="hero-phones">
+    <!-- Phone 1: Home screen -->
+    <div class="phone" style="transform: translateY(20px) rotate(-4deg);">
+      <div class="phone-screen">
+        <svg viewBox="0 0 200 430" xmlns="http://www.w3.org/2000/svg" class="screen-content">
+          <rect width="200" height="430" fill="#1D9E75"/>
+          <!-- Status bar -->
+          <text x="100" y="22" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="9" font-family="Tajawal">9:41</text>
+          <!-- Greeting -->
+          <text x="100" y="60" text-anchor="middle" fill="white" font-size="11" font-family="Tajawal" font-weight="600">مرحباً، ياسر 👋</text>
+          <text x="100" y="78" text-anchor="middle" fill="rgba(255,255,255,0.75)" font-size="9" font-family="Tajawal">الأربعاء، 11 يونيو 2026</text>
+          <!-- Budget ring -->
+          <circle cx="100" cy="145" r="52" fill="rgba(255,255,255,0.1)"/>
+          <circle cx="100" cy="145" r="52" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="8"/>
+          <circle cx="100" cy="145" r="52" fill="none" stroke="white" stroke-width="8" stroke-linecap="round"
+            stroke-dasharray="230 326" transform="rotate(-90 100 145)"/>
+          <text x="100" y="140" text-anchor="middle" fill="white" font-size="18" font-family="Tajawal" font-weight="900">1,240</text>
+          <text x="100" y="155" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="8" font-family="Tajawal">ر.س هذا الشهر</text>
+          <text x="100" y="168" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="7" font-family="Tajawal">من 2,000 ر.س</text>
+          <!-- Score -->
+          <rect x="16" y="210" width="168" height="36" rx="12" fill="rgba(255,255,255,0.15)"/>
+          <text x="100" y="233" text-anchor="middle" fill="white" font-size="10" font-family="Tajawal">تقييم المصاريف: ⭐ 8.5 / 10</text>
+          <!-- Quick add buttons -->
+          <rect x="16" y="256" width="78" height="40" rx="12" fill="white"/>
+          <text x="55" y="280" text-anchor="middle" fill="#1D9E75" font-size="10" font-family="Tajawal" font-weight="700">📸 أضف</text>
+          <rect x="106" y="256" width="78" height="40" rx="12" fill="rgba(255,255,255,0.2)"/>
+          <text x="145" y="280" text-anchor="middle" fill="white" font-size="10" font-family="Tajawal" font-weight="700">📊 التقارير</text>
+          <!-- Recent expenses -->
+          <text x="16" y="316" fill="rgba(255,255,255,0.7)" font-size="9" font-family="Tajawal">آخر المصاريف</text>
+          <rect x="16" y="324" width="168" height="32" rx="10" fill="rgba(255,255,255,0.12)"/>
+          <text x="28" y="344" fill="white" font-size="9" font-family="Tajawal">🛒 بندة</text>
+          <text x="172" y="344" text-anchor="end" fill="#a7f3d0" font-size="9" font-family="Tajawal" font-weight="700">245 ر.س</text>
+          <rect x="16" y="360" width="168" height="32" rx="10" fill="rgba(255,255,255,0.08)"/>
+          <text x="28" y="380" fill="white" font-size="9" font-family="Tajawal">💊 صيدلية النهدي</text>
+          <text x="172" y="380" text-anchor="end" fill="#a7f3d0" font-size="9" font-family="Tajawal" font-weight="700">88 ر.س</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Phone 2: Add expense (CENTER MAIN) -->
+    <div class="phone hero-phone-main">
+      <div class="phone-screen">
+        <svg viewBox="0 0 200 430" xmlns="http://www.w3.org/2000/svg" class="screen-content">
+          <rect width="200" height="430" fill="#f9fafb"/>
+          <!-- Header -->
+          <rect width="200" height="70" fill="#1D9E75"/>
+          <text x="100" y="28" text-anchor="middle" fill="white" font-size="9" font-family="Tajawal">9:41</text>
+          <text x="100" y="52" text-anchor="middle" fill="white" font-size="13" font-family="Tajawal" font-weight="800">إضافة مصروف</text>
+          <!-- Camera area -->
+          <rect x="16" y="82" width="168" height="110" rx="16" fill="#e8f7f2" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="6,3"/>
+          <text x="100" y="128" text-anchor="middle" fill="#1D9E75" font-size="28">📸</text>
+          <text x="100" y="150" text-anchor="middle" fill="#1D9E75" font-size="11" font-family="Tajawal" font-weight="700">صوّر الفاتورة</text>
+          <text x="100" y="166" text-anchor="middle" fill="#9ca3af" font-size="9" font-family="Tajawal">أو أدخل يدوياً</text>
+          <!-- Form fields -->
+          <rect x="16" y="204" width="168" height="34" rx="10" fill="white" stroke="#e5e7eb" stroke-width="1"/>
+          <text x="28" y="225" fill="#9ca3af" font-size="9" font-family="Tajawal">المحل / الشركة</text>
+          <text x="172" y="225" text-anchor="end" fill="#1f2937" font-size="9" font-family="Tajawal">بندة</text>
+          <rect x="16" y="244" width="168" height="34" rx="10" fill="white" stroke="#e5e7eb" stroke-width="1"/>
+          <text x="28" y="265" fill="#9ca3af" font-size="9" font-family="Tajawal">المبلغ (ر.س)</text>
+          <text x="172" y="265" text-anchor="end" fill="#1D9E75" font-size="11" font-family="Tajawal" font-weight="800">245.00</text>
+          <rect x="16" y="284" width="168" height="34" rx="10" fill="white" stroke="#e5e7eb" stroke-width="1"/>
+          <text x="28" y="305" fill="#9ca3af" font-size="9" font-family="Tajawal">التصنيف</text>
+          <text x="172" y="305" text-anchor="end" fill="#1f2937" font-size="9" font-family="Tajawal">🛒 بقالة</text>
+          <!-- Items list -->
+          <text x="16" y="335" fill="#9ca3af" font-size="8" font-family="Tajawal">الأصناف المستخرجة تلقائياً</text>
+          <rect x="16" y="342" width="168" height="24" rx="8" fill="#e8f7f2"/>
+          <text x="28" y="358" fill="#1D9E75" font-size="8" font-family="Tajawal">حليب نادك 1L</text>
+          <text x="172" y="358" text-anchor="end" fill="#1D9E75" font-size="8" font-family="Tajawal">7.50</text>
+          <rect x="16" y="370" width="168" height="24" rx="8" fill="#f3f4f6"/>
+          <text x="28" y="386" fill="#4b5563" font-size="8" font-family="Tajawal">خبز توست بن يدر</text>
+          <text x="172" y="386" text-anchor="end" fill="#4b5563" font-size="8" font-family="Tajawal">5.25</text>
+          <!-- Save button -->
+          <rect x="16" y="402" width="168" height="20" rx="10" fill="#1D9E75"/>
+          <text x="100" y="415" text-anchor="middle" fill="white" font-size="9" font-family="Tajawal" font-weight="800">✓ حفظ المصروف</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Phone 3: Smart page -->
+    <div class="phone" style="transform: translateY(20px) rotate(4deg);">
+      <div class="phone-screen">
+        <svg viewBox="0 0 200 430" xmlns="http://www.w3.org/2000/svg" class="screen-content">
+          <rect width="200" height="430" fill="#f9fafb"/>
+          <rect width="200" height="70" fill="#1D9E75"/>
+          <text x="100" y="28" text-anchor="middle" fill="white" font-size="9" font-family="Tajawal">9:41</text>
+          <text x="100" y="52" text-anchor="middle" fill="white" font-size="13" font-family="Tajawal" font-weight="800">🧠 خلك فطين</text>
+          <!-- Tabs -->
+          <rect x="16" y="78" width="168" height="30" rx="12" fill="white"/>
+          <rect x="18" y="80" width="80" height="26" rx="10" fill="#1D9E75"/>
+          <text x="58" y="97" text-anchor="middle" fill="white" font-size="9" font-family="Tajawal" font-weight="700">فرص التوفير</text>
+          <text x="140" y="97" text-anchor="middle" fill="#9ca3af" font-size="9" font-family="Tajawal">قارن صنفين</text>
+          <!-- AI advisor card -->
+          <rect x="16" y="116" width="168" height="70" rx="14" fill="linear-gradient(135deg,#065f46,#1D9E75)"/>
+          <rect x="16" y="116" width="168" height="70" rx="14" fill="#065f46"/>
+          <text x="30" y="138" fill="#a7f3d0" font-size="10" font-family="Tajawal">🧙 عمار يقول:</text>
+          <text x="28" y="155" fill="white" font-size="8.5" font-family="Tajawal">لو اشتريت الحفاظات من</text>
+          <text x="28" y="168" fill="white" font-size="8.5" font-family="Tajawal">كارفور وفّرت 47 ر.س 💰</text>
+          <text x="172" y="180" text-anchor="end" fill="#a7f3d0" font-size="7.5" font-family="Tajawal">AI powered</text>
+          <!-- Saving opportunities -->
+          <rect x="16" y="196" width="168" height="44" rx="12" fill="white"/>
+          <text x="28" y="214" fill="#1f2937" font-size="9" font-family="Tajawal" font-weight="700">🛒 حفاظات Huggies</text>
+          <text x="28" y="228" fill="#9ca3af" font-size="8" font-family="Tajawal">بندة: 94 ر.س  ·  كارفور: 47 ر.س</text>
+          <rect x="130" y="204" width="46" height="26" rx="8" fill="#ecfdf5"/>
+          <text x="153" y="221" text-anchor="middle" fill="#1D9E75" font-size="9" font-family="Tajawal" font-weight="800">50% وفر</text>
+          <rect x="16" y="246" width="168" height="44" rx="12" fill="white"/>
+          <text x="28" y="264" fill="#1f2937" font-size="9" font-family="Tajawal" font-weight="700">🥛 حليب النادك 1L</text>
+          <text x="28" y="278" fill="#9ca3af" font-size="8" font-family="Tajawal">العثيم: 8.5 ر.س  ·  بندة: 7.5 ر.س</text>
+          <rect x="130" y="254" width="46" height="26" rx="8" fill="#ecfdf5"/>
+          <text x="153" y="271" text-anchor="middle" fill="#1D9E75" font-size="9" font-family="Tajawal" font-weight="800">12% وفر</text>
+          <!-- Total savings -->
+          <rect x="16" y="300" width="168" height="36" rx="12" fill="#1D9E75"/>
+          <text x="100" y="314" text-anchor="middle" fill="white" font-size="9" font-family="Tajawal">التوفير المحتمل شهرياً</text>
+          <text x="100" y="328" text-anchor="middle" fill="#a7f3d0" font-size="13" font-family="Tajawal" font-weight="900">214 ر.س 🎉</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ FEATURES GRID ══════════════════════════════ -->
+<section class="features-intro">
+  <div class="features-intro-inner fade-up">
+    <div class="section-label">🚀 المزايا</div>
+    <h2 class="section-title">كل أدوات التوفير في مكان واحد</h2>
+    <p class="section-sub">فطين مش بس تطبيق مصاريف — هو مستشارك المالي الذكي في جيبك</p>
+  </div>
+
+  <div class="feat-grid">
+    <div class="feat-card fade-up">
+      <span class="feat-icon">📸</span>
+      <h3 class="feat-title">مسح الفواتير بالكاميرا</h3>
+      <p class="feat-desc">صوّر فاتورتك واترك فطين يستخرج كل التفاصيل تلقائياً — المحل، المبلغ، والأصناف بدون تدخل منك.</p>
+      <span class="feat-tag">AI مدعوم</span>
+    </div>
+    <div class="feat-card fade-up">
+      <span class="feat-icon">💬</span>
+      <h3 class="feat-title">إدخال نصي سريع</h3>
+      <p class="feat-desc">الصق رسالة SMS من المصرف أو اكتب "بندة 245" وفطين يفهم ويدخّل المصروف على طول.</p>
+      <span class="feat-tag">ذكاء اصطناعي</span>
+    </div>
+    <div class="feat-card fade-up">
+      <span class="feat-icon">🧠</span>
+      <h3 class="feat-title">خلك فطين</h3>
+      <p class="feat-desc">عمار مستشارك AI يحلّل مشترياتك ويكشف وين تدفع أكثر مما يلزم مقارنةً بمحلات ثانية.</p>
+      <span class="feat-tag">AI مدعوم</span>
+    </div>
+    <div class="feat-card fade-up">
+      <span class="feat-icon">⚖️</span>
+      <h3 class="feat-title">قارن صنفين</h3>
+      <p class="feat-desc">ابحث عن أي صنفين من مشترياتك وقارن سعر الوحدة — يحسب لك الأرخص بذكاء حتى لو الكميات مختلفة.</p>
+      <span class="feat-tag">مقارنة ذكية</span>
+    </div>
+    <div class="feat-card fade-up">
+      <span class="feat-icon">📊</span>
+      <h3 class="feat-title">رسوم بيانية تفاعلية</h3>
+      <p class="feat-desc">دوناتشارت للتصنيفات وأعمدة يومية تبيّن إنفاقك بالأيام مع خط المتوسط — تعرف وين تروح فلوسك.</p>
+      <span class="feat-tag">تحليلات</span>
+    </div>
+    <div class="feat-card fade-up">
+      <span class="feat-icon">🔍</span>
+      <h3 class="feat-title">بحث شامل</h3>
+      <p class="feat-desc">ابحث عن أي صنف أو محل أو تصنيف وشوف نتائج من كل الأشهر بتمييز الكلمة المطلوبة بالأصفر.</p>
+      <span class="feat-tag">عبر كل الأشهر</span>
+    </div>
+    <div class="feat-card fade-up">
+      <span class="feat-icon">💰</span>
+      <h3 class="feat-title">ميزانية شهرية</h3>
+      <p class="feat-desc">حدد ميزانيتك واتابع الإنفاق بمخطط دائري ينبهك لما تقترب من الحد الأقصى.</p>
+      <span class="feat-tag">تتبع ذكي</span>
+    </div>
+    <div class="feat-card fade-up">
+      <span class="feat-icon">🏷️</span>
+      <h3 class="feat-title">تصنيفات مخصصة</h3>
+      <p class="feat-desc">أضف تصنيفاتك الخاصة بإيموجي تختاره — المطعم، الأطفال، السيارة — كيفما يناسب حياتك.</p>
+      <span class="feat-tag">شخصي</span>
+    </div>
+    <div class="feat-card fade-up">
+      <span class="feat-icon">⭐</span>
+      <h3 class="feat-title">تقييم جودة المصاريف</h3>
+      <p class="feat-desc">تقييم من 1 إلى 10 يقيس كيف تُسجّل مصاريفك — التفاصيل، الأصناف، والانتظام في التسجيل.</p>
+      <span class="feat-tag">مؤشر أداء</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ SHOWCASE ROWS ══════════════════════════════ -->
+<section style="background:#fff; padding: 40px 24px 80px;">
+  <div class="showcase">
+
+    <!-- Row 1: Smart analysis -->
+    <div class="showcase-row fade-up">
+      <div class="showcase-text">
+        <div class="section-label">🧙 عمار AI</div>
+        <h2 class="section-title">مستشار ذكي يعرف وين تكسب</h2>
+        <p class="section-sub">
+          عمار يحلّل كل مشترياتك السابقة ويقارن الأسعار عبر المحلات المختلفة.
+          مش بس يكشف الفرق — يحسب لك التوفير الفعلي لو غيّرت عاداتك الشرائية.
+        </p>
+        <ul class="showcase-bullets">
+          <li>تحليل الأصناف المكررة من محلات متعددة</li>
+          <li>حساب التوفير السنوي المحتمل</li>
+          <li>نصائح بالعربي السعودي الواضح</li>
+          <li>تحديث تلقائي مع كل فاتورة جديدة</li>
+        </ul>
+      </div>
+      <div class="showcase-visual">
+        <div class="showcase-phones">
+          <div class="phone">
+            <div class="phone-screen">
+              <svg viewBox="0 0 200 430" xmlns="http://www.w3.org/2000/svg" class="screen-content">
+                <rect width="200" height="430" fill="#f9fafb"/>
+                <rect width="200" height="60" fill="#1D9E75"/>
+                <text x="100" y="38" text-anchor="middle" fill="white" font-size="12" font-family="Tajawal" font-weight="800">خلك فطين 🧠</text>
+                <!-- AI card -->
+                <rect x="12" y="70" width="176" height="90" rx="16" fill="#064e3b"/>
+                <circle cx="34" cy="95" r="16" fill="#1D9E75"/>
+                <text x="34" y="100" text-anchor="middle" fill="white" font-size="16">🧙</text>
+                <text x="56" y="92" fill="#6ee7b7" font-size="9" font-family="Tajawal" font-weight="700">عمار يقول</text>
+                <text x="56" y="107" fill="white" font-size="8" font-family="Tajawal">لو تشتري من العثيم بدل</text>
+                <text x="56" y="119" fill="white" font-size="8" font-family="Tajawal">بندة، توفّر 214 ر.س شهرياً</text>
+                <rect x="24" y="140" width="152" height="14" rx="7" fill="#065f46"/>
+                <rect x="24" y="140" width="110" height="14" rx="7" fill="#10b981"/>
+                <text x="100" y="151" text-anchor="middle" fill="white" font-size="7" font-family="Tajawal">نسبة التوفير 51%</text>
+                <!-- Items -->
+                <text x="16" y="178" fill="#6b7280" font-size="8.5" font-family="Tajawal" font-weight="700">فرص التوفير</text>
+                <rect x="12" y="186" width="176" height="44" rx="12" fill="white" stroke="#e5e7eb" stroke-width="1"/>
+                <text x="24" y="202" fill="#1f2937" font-size="9" font-family="Tajawal" font-weight="700">🛒 حفاظات Huggies</text>
+                <text x="24" y="216" fill="#9ca3af" font-size="7.5" font-family="Tajawal">بندة: 94ر.س · كارفور: 47ر.س</text>
+                <rect x="134" y="192" width="46" height="26" rx="8" fill="#ecfdf5"/>
+                <text x="157" y="209" text-anchor="middle" fill="#065f46" font-size="9" font-family="Tajawal" font-weight="800">وفر 47ر.س</text>
+                <rect x="12" y="236" width="176" height="44" rx="12" fill="white" stroke="#e5e7eb" stroke-width="1"/>
+                <text x="24" y="252" fill="#1f2937" font-size="9" font-family="Tajawal" font-weight="700">🥛 حليب النادك</text>
+                <text x="24" y="266" fill="#9ca3af" font-size="7.5" font-family="Tajawal">العثيم: 8.5ر.س · بندة: 7.5ر.س</text>
+                <rect x="134" y="242" width="46" height="26" rx="8" fill="#ecfdf5"/>
+                <text x="157" y="259" text-anchor="middle" fill="#065f46" font-size="9" font-family="Tajawal" font-weight="800">وفر 12%</text>
+                <!-- Habits section -->
+                <text x="16" y="298" fill="#6b7280" font-size="8.5" font-family="Tajawal" font-weight="700">عاداتك الشرائية</text>
+                <rect x="12" y="306" width="176" height="40" rx="12" fill="#fef3c7"/>
+                <text x="24" y="322" fill="#92400e" font-size="9" font-family="Tajawal" font-weight="700">🍞 خبز توست</text>
+                <text x="24" y="335" fill="#b45309" font-size="7.5" font-family="Tajawal">دايماً من بندة — 6 مرات هذا الشهر</text>
+              </svg>
+            </div>
+          </div>
+          <div class="phone">
+            <div class="phone-screen">
+              <svg viewBox="0 0 200 430" xmlns="http://www.w3.org/2000/svg" class="screen-content">
+                <rect width="200" height="430" fill="#f9fafb"/>
+                <rect width="200" height="60" fill="#1D9E75"/>
+                <text x="100" y="38" text-anchor="middle" fill="white" font-size="12" font-family="Tajawal" font-weight="800">⚖️ قارن صنفين</text>
+                <!-- Search boxes -->
+                <text x="16" y="82" fill="#6b7280" font-size="8.5" font-family="Tajawal">الصنف الأول</text>
+                <rect x="12" y="88" width="176" height="36" rx="12" fill="white" stroke="#1D9E75" stroke-width="1.5"/>
+                <text x="24" y="111" fill="#1f2937" font-size="10" font-family="Tajawal" font-weight="700">🧷 حفاظ 60 حبة</text>
+                <text x="168" y="111" text-anchor="end" fill="#1D9E75" font-size="8" font-family="Tajawal">94 ر.س</text>
+                <text x="16" y="142" fill="#6b7280" font-size="8.5" font-family="Tajawal">الصنف الثاني</text>
+                <rect x="12" y="148" width="176" height="36" rx="12" fill="white" stroke="#1D9E75" stroke-width="1.5"/>
+                <text x="24" y="171" fill="#1f2937" font-size="10" font-family="Tajawal" font-weight="700">🧷 حفاظ 14 حبة</text>
+                <text x="168" y="171" text-anchor="end" fill="#1D9E75" font-size="8" font-family="Tajawal">10 ر.س</text>
+                <!-- Compare button -->
+                <rect x="32" y="194" width="136" height="32" rx="14" fill="#1D9E75"/>
+                <text x="100" y="214" text-anchor="middle" fill="white" font-size="11" font-family="Tajawal" font-weight="800">قارن الصنفين ⚖️</text>
+                <!-- Result card -->
+                <rect x="12" y="238" width="176" height="100" rx="16" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1.5"/>
+                <text x="100" y="258" text-anchor="middle" fill="#065f46" font-size="9" font-family="Tajawal" font-weight="700">📊 نتيجة المقارنة</text>
+                <!-- Item 1 -->
+                <rect x="20" y="265" width="74" height="40" rx="10" fill="white"/>
+                <text x="57" y="281" text-anchor="middle" fill="#9ca3af" font-size="7.5" font-family="Tajawal">60 حبة / 94ر.س</text>
+                <text x="57" y="296" text-anchor="middle" fill="#1f2937" font-size="9" font-family="Tajawal" font-weight="800">1.57 ر.س/حبة</text>
+                <!-- Item 2 winner -->
+                <rect x="106" y="265" width="74" height="40" rx="10" fill="#1D9E75"/>
+                <text x="143" y="278" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="7.5" font-family="Tajawal">14 حبة / 10ر.س</text>
+                <text x="143" y="293" text-anchor="middle" fill="white" font-size="9" font-family="Tajawal" font-weight="800">0.71 ر.س/حبة</text>
+                <text x="143" y="303" text-anchor="middle" fill="#a7f3d0" font-size="7" font-family="Tajawal">🏆 الأرخص</text>
+                <text x="100" y="328" text-anchor="middle" fill="#065f46" font-size="9" font-family="Tajawal" font-weight="800">توفير 55% للوحدة ✨</text>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Charts -->
+    <div class="showcase-row reverse fade-up">
+      <div class="showcase-text">
+        <div class="section-label">📈 الرسوم البيانية</div>
+        <h2 class="section-title">مصاريفك بالصورة والأرقام</h2>
+        <p class="section-sub">
+          شوف توزيع مصاريفك بمخطط دائري ملوّن لكل تصنيف، وأعمدة يومية تبيّن وين كان الإنفاق الأعلى مع خط المتوسط اليومي.
+        </p>
+        <ul class="showcase-bullets">
+          <li>دوناتشارت لكل تصنيف بألوانه</li>
+          <li>أعمدة يومية للإنفاق اليومي</li>
+          <li>خط المتوسط اليومي</li>
+          <li>تبديل سريع بين القائمة والرسوم</li>
+        </ul>
+      </div>
+      <div class="showcase-visual">
+        <div class="phone" style="width:200px; transform:none;">
+          <div class="phone-screen">
+            <svg viewBox="0 0 200 430" xmlns="http://www.w3.org/2000/svg" class="screen-content">
+              <rect width="200" height="430" fill="#f9fafb"/>
+              <rect width="200" height="60" fill="#1D9E75"/>
+              <text x="100" y="38" text-anchor="middle" fill="white" font-size="12" font-family="Tajawal" font-weight="800">📊 المصاريف</text>
+              <!-- Month nav -->
+              <rect x="12" y="68" width="176" height="30" rx="12" fill="white"/>
+              <text x="24" y="87" fill="#9ca3af" font-size="14">‹</text>
+              <text x="100" y="88" text-anchor="middle" fill="#1f2937" font-size="9.5" font-family="Tajawal" font-weight="700">يونيو 2026</text>
+              <text x="176" y="87" text-anchor="end" fill="#9ca3af" font-size="14">›</text>
+
+              <!-- Donut chart -->
+              <!-- Background circle -->
+              <circle cx="100" cy="152" r="44" fill="none" stroke="#f3f4f6" stroke-width="16"/>
+              <!-- Segments: groceries 40% = 90deg, pharmacy 20% = 45deg, etc -->
+              <circle cx="100" cy="152" r="44" fill="none" stroke="#1D9E75" stroke-width="16"
+                stroke-dasharray="110 166" stroke-dashoffset="0" transform="rotate(-90 100 152)"/>
+              <circle cx="100" cy="152" r="44" fill="none" stroke="#3b82f6" stroke-width="16"
+                stroke-dasharray="55 221" stroke-dashoffset="-110" transform="rotate(-90 100 152)"/>
+              <circle cx="100" cy="152" r="44" fill="none" stroke="#f59e0b" stroke-width="16"
+                stroke-dasharray="41 235" stroke-dashoffset="-165" transform="rotate(-90 100 152)"/>
+              <circle cx="100" cy="152" r="44" fill="none" stroke="#ec4899" stroke-width="16"
+                stroke-dasharray="20 256" stroke-dashoffset="-206" transform="rotate(-90 100 152)"/>
+              <!-- Center text -->
+              <circle cx="100" cy="152" r="28" fill="white"/>
+              <text x="100" y="149" text-anchor="middle" fill="#1f2937" font-size="13" font-family="Tajawal" font-weight="900">1,240</text>
+              <text x="100" y="161" text-anchor="middle" fill="#9ca3af" font-size="7" font-family="Tajawal">ر.س</text>
+
+              <!-- Legend -->
+              <circle cx="22" cy="212" r="5" fill="#1D9E75"/>
+              <text x="30" y="216" fill="#4b5563" font-size="8" font-family="Tajawal">🛒 بقالة 40%</text>
+              <circle cx="100" cy="212" r="5" fill="#3b82f6"/>
+              <text x="108" y="216" fill="#4b5563" font-size="8" font-family="Tajawal">💊 صيدلية 20%</text>
+              <circle cx="22" cy="228" r="5" fill="#f59e0b"/>
+              <text x="30" y="232" fill="#4b5563" font-size="8" font-family="Tajawal">🍕 مطاعم 15%</text>
+              <circle cx="100" cy="228" r="5" fill="#ec4899"/>
+              <text x="108" y="232" fill="#4b5563" font-size="8" font-family="Tajawal">👗 ملابس 8%</text>
+
+              <!-- Daily bars -->
+              <text x="16" y="254" fill="#9ca3af" font-size="8" font-family="Tajawal" font-weight="700">الإنفاق اليومي - يونيو</text>
+              <!-- Bars background -->
+              <rect x="12" y="260" width="176" height="90" rx="12" fill="white"/>
+              <!-- Avg line at y=295 -->
+              <line x1="16" y1="310" x2="184" y2="310" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="3,2"/>
+              <text x="185" y="313" fill="#9ca3af" font-size="6" font-family="Tajawal">متوسط</text>
+              <!-- Bars (simplified) -->
+              <rect x="20" y="318" width="8" height="22" rx="3" fill="#d1fae5"/>
+              <rect x="32" y="306" width="8" height="34" rx="3" fill="#1D9E75" opacity="0.6"/>
+              <rect x="44" y="300" width="8" height="40" rx="3" fill="#1D9E75" opacity="0.7"/>
+              <rect x="56" y="322" width="8" height="18" rx="3" fill="#d1fae5"/>
+              <rect x="68" y="295" width="8" height="45" rx="3" fill="#1D9E75"/>
+              <rect x="80" y="312" width="8" height="28" rx="3" fill="#d1fae5"/>
+              <rect x="92" y="303" width="8" height="37" rx="3" fill="#1D9E75" opacity="0.6"/>
+              <rect x="104" y="319" width="8" height="21" rx="3" fill="#d1fae5"/>
+              <rect x="116" y="308" width="8" height="32" rx="3" fill="#1D9E75" opacity="0.5"/>
+              <rect x="128" y="285" width="8" height="55" rx="3" fill="#1D9E75"/>
+              <!-- Today highlighted -->
+              <rect x="140" y="298" width="8" height="42" rx="3" fill="#1D9E75"/>
+              <circle cx="144" cy="296" r="3" fill="#1D9E75"/>
+              <rect x="152" y="315" width="8" height="25" rx="3" fill="#d1fae5"/>
+              <!-- Toggle button -->
+              <rect x="152" y="366" width="36" height="22" rx="11" fill="#1D9E75"/>
+              <text x="170" y="381" text-anchor="middle" fill="white" font-size="11">📋</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Search -->
+    <div class="showcase-row fade-up">
+      <div class="showcase-text">
+        <div class="section-label">🔍 البحث الذكي</div>
+        <h2 class="section-title">اعثر على أي مصروف في ثانية</h2>
+        <p class="section-sub">
+          ابحث عن أي صنف، محل، أو تصنيف وشوف النتائج من كل الأشهر في لحظة.
+          الكلمة المطلوبة تتميّز بالأصفر وفيك تعدّل أو تحذف مباشرةً.
+        </p>
+        <ul class="showcase-bullets">
+          <li>بحث عبر كل الأشهر والسنوات</li>
+          <li>تمييز الكلمة بالأصفر في النتائج</li>
+          <li>تعديل المصروف مباشرةً من نتيجة البحث</li>
+          <li>إجمالي وعدد النتائج دفعةً واحدة</li>
+        </ul>
+      </div>
+      <div class="showcase-visual">
+        <div class="phone" style="width:200px; transform:none;">
+          <div class="phone-screen">
+            <svg viewBox="0 0 200 430" xmlns="http://www.w3.org/2000/svg" class="screen-content">
+              <rect width="200" height="430" fill="#f9fafb"/>
+              <rect width="200" height="60" fill="#1D9E75"/>
+              <text x="100" y="38" text-anchor="middle" fill="white" font-size="12" font-family="Tajawal" font-weight="800">🔍 البحث</text>
+              <!-- Search bar -->
+              <rect x="12" y="68" width="176" height="36" rx="14" fill="white" stroke="#1D9E75" stroke-width="1.5"/>
+              <text x="30" y="91" fill="#1D9E75" font-size="13">🔍</text>
+              <text x="46" y="91" fill="#1f2937" font-size="10" font-family="Tajawal">حفاظ</text>
+              <text x="180" y="91" text-anchor="end" fill="#9ca3af" font-size="11">✕</text>
+              <!-- Stats bar -->
+              <rect x="12" y="112" width="176" height="26" rx="10" fill="#e8f7f2"/>
+              <text x="100" y="129" text-anchor="middle" fill="#1D9E75" font-size="9" font-family="Tajawal" font-weight="700">نتائج "حفاظ" · 4 نتائج · 338 ر.س</text>
+              <!-- Result 1 -->
+              <rect x="12" y="146" width="176" height="62" rx="12" fill="white" stroke="#e5e7eb" stroke-width="1"/>
+              <text x="24" y="163" fill="#9ca3af" font-size="7.5" font-family="Tajawal">بندة · 15 مايو</text>
+              <text x="24" y="177" fill="#1f2937" font-size="9" font-family="Tajawal" font-weight="700">🛒 بقالة</text>
+              <text x="176" y="177" text-anchor="end" fill="#1D9E75" font-size="10" font-family="Tajawal" font-weight="800">94 ر.س</text>
+              <!-- Highlighted item -->
+              <rect x="24" y="185" width="100" height="16" rx="5" fill="#fef9c3"/>
+              <text x="30" y="197" fill="#78350f" font-size="8" font-family="Tajawal">حفاظ Huggies 60 حبة</text>
+              <!-- Edit button -->
+              <rect x="140" y="184" width="38" height="18" rx="8" fill="#e8f7f2"/>
+              <text x="159" y="196" text-anchor="middle" fill="#1D9E75" font-size="7.5" font-family="Tajawal" font-weight="700">✏️ تعديل</text>
+              <!-- Result 2 -->
+              <rect x="12" y="216" width="176" height="62" rx="12" fill="white" stroke="#e5e7eb" stroke-width="1"/>
+              <text x="24" y="233" fill="#9ca3af" font-size="7.5" font-family="Tajawal">كارفور · 2 مايو</text>
+              <text x="24" y="247" fill="#1f2937" font-size="9" font-family="Tajawal" font-weight="700">🛒 بقالة</text>
+              <text x="176" y="247" text-anchor="end" fill="#1D9E75" font-size="10" font-family="Tajawal" font-weight="800">47 ر.س</text>
+              <rect x="24" y="255" width="100" height="16" rx="5" fill="#fef9c3"/>
+              <text x="30" y="267" fill="#78350f" font-size="8" font-family="Tajawal">حفاظ Pampers 14 حبة</text>
+              <rect x="140" y="254" width="38" height="18" rx="8" fill="#e8f7f2"/>
+              <text x="159" y="266" text-anchor="middle" fill="#1D9E75" font-size="7.5" font-family="Tajawal" font-weight="700">✏️ تعديل</text>
+              <!-- Result 3 -->
+              <rect x="12" y="286" width="176" height="60" rx="12" fill="white" stroke="#e5e7eb" stroke-width="1"/>
+              <text x="24" y="303" fill="#9ca3af" font-size="7.5" font-family="Tajawal">بندة · 8 أبريل</text>
+              <text x="24" y="317" fill="#1f2937" font-size="9" font-family="Tajawal" font-weight="700">🛒 بقالة</text>
+              <text x="176" y="317" text-anchor="end" fill="#1D9E75" font-size="10" font-family="Tajawal" font-weight="800">94 ر.س</text>
+              <rect x="24" y="325" width="100" height="16" rx="5" fill="#fef9c3"/>
+              <text x="30" y="337" fill="#78350f" font-size="8" font-family="Tajawal">حفاظ Huggies 60 حبة</text>
+              <!-- More results -->
+              <rect x="12" y="356" width="176" height="28" rx="12" fill="#f3f4f6"/>
+              <text x="100" y="374" text-anchor="middle" fill="#9ca3af" font-size="9" font-family="Tajawal">+ نتيجة أخرى · اضغط لعرضها</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ══════════════════════════════ STATS ══════════════════════════════ -->
+<div class="stats-band fade-up">
+  <div class="stats-grid">
+    <div>
+      <div class="stat-num">📸</div>
+      <div class="stat-label">مسح فواتير بالكاميرا</div>
+    </div>
+    <div>
+      <div class="stat-num">🧠</div>
+      <div class="stat-label">ذكاء اصطناعي حقيقي</div>
+    </div>
+    <div>
+      <div class="stat-num">⚖️</div>
+      <div class="stat-label">مقارنة الأصناف</div>
+    </div>
+    <div>
+      <div class="stat-num">💰</div>
+      <div class="stat-label">توفير فعلي موثّق</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ BOTTOM NAV SHOWCASE ══════════════════════════════ -->
+<section style="background:#fff; text-align:center; padding:60px 24px 40px;">
+  <div class="section-label" style="margin:0 auto 16px;">📱 واجهة سهلة</div>
+  <h2 class="section-title" style="max-width:500px; margin:0 auto 12px;">كل شيء على بُعد ضغطة</h2>
+  <p style="font-size:15px; color:var(--gray-600); max-width:420px; margin:0 auto 40px; line-height:1.7;">
+    شريط تنقّل سريع يأخذك لأي قسم في ثانية — الرئيسية، المصاريف، الإضافة، فطين، التقارير، والإعدادات
+  </p>
+  <!-- Bottom nav mockup -->
+  <div style="display:inline-block; background:#fff; border:1px solid #e5e7eb; border-radius:24px; padding:16px 24px; box-shadow:0 8px 32px rgba(0,0,0,0.08);">
+    <div style="display:flex; gap:20px; align-items:flex-end; justify-content:center; direction:rtl;">
+      <div style="text-align:center; opacity:0.4;">
+        <div style="font-size:22px;">🏠</div>
+        <div style="font-size:10px; font-weight:700; color:#6b7280; margin-top:3px;">الرئيسية</div>
+      </div>
+      <div style="text-align:center; opacity:0.4;">
+        <div style="font-size:22px;">🧾</div>
+        <div style="font-size:10px; font-weight:700; color:#6b7280; margin-top:3px;">المصاريف</div>
+      </div>
+      <div style="text-align:center; margin-bottom:-12px;">
+        <div style="width:56px; height:56px; background:#1D9E75; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:28px; color:white; box-shadow:0 4px 16px rgba(29,158,117,0.4);">+</div>
+        <div style="font-size:10px; font-weight:700; color:#1D9E75; margin-top:4px;">إضافة</div>
+      </div>
+      <div style="text-align:center; opacity:0.4;">
+        <div style="font-size:22px;">🧠</div>
+        <div style="font-size:10px; font-weight:700; color:#6b7280; margin-top:3px;">فطين</div>
+      </div>
+      <div style="text-align:center; opacity:1;">
+        <div style="font-size:22px;">📊</div>
+        <div style="font-size:10px; font-weight:700; color:#1D9E75; margin-top:3px;">التقارير</div>
+        <div style="width:5px; height:5px; background:#1D9E75; border-radius:50%; margin:3px auto 0;"></div>
+      </div>
+      <div style="text-align:center; opacity:0.4;">
+        <div style="font-size:22px;">⚙️</div>
+        <div style="font-size:10px; font-weight:700; color:#6b7280; margin-top:3px;">الإعدادات</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ CTA ══════════════════════════════ -->
+<div class="cta-band fade-up">
+  <div style="font-size:56px; margin-bottom:16px;">🧠</div>
+  <h2>جاهز تكون فطين؟</h2>
+  <p>ابدأ تتبّع مصاريفك اليوم وشوف وين تروح فلوسك</p>
+  <a href="https://fateen.app" class="btn-green">
+    🚀 ابدأ الآن — مجاناً
+  </a>
+  <p style="margin-top:16px; font-size:12px; color:var(--gray-400);">تصميم وتطوير: ياسر المنجم · مدعوم بالذكاء الاصطناعي</p>
+</div>
+
+<!-- ══════════════════════════════ FOOTER ══════════════════════════════ -->
+<footer>
+  <strong>فطين</strong> — تطبيق المصاريف الذكي · جميع الحقوق محفوظة 2026
+</footer>
+
+<script>
+  // Fade in on scroll
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
