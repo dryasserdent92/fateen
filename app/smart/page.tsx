@@ -603,9 +603,9 @@ function SmartHeader() {
   return (
     <div className="px-5 pt-10 pb-4">
       <div className="flex items-center gap-3">
-        <div className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-2xl shadow-lg">🧠</div>
+        <div className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-2xl shadow-lg">💰</div>
         <div>
-          <h1 className="text-2xl font-extrabold text-white">خلك فطين</h1>
+          <h1 className="text-2xl font-extrabold text-white">وفّرلي</h1>
           <p className="text-xs text-white/50">مقارنة الأسعار وتحليل عاداتك الشرائية</p>
         </div>
       </div>

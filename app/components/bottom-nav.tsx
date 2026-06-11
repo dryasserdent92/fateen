@@ -7,7 +7,7 @@ const NAV_ITEMS = [
   { href: "/",         icon: "🏠", label: "الرئيسية" },
   { href: "/expenses", icon: "🧾", label: "المصاريف" },
   { href: "/add",      icon: null,  label: "إضافة"    }, /* زر الإضافة المركزي */
-  { href: "/smart",    icon: "🧠", label: "فطين"      },
+  { href: "/smart",    icon: "💰", label: "وفّرلي"    },
   { href: "/reports",  icon: "📊", label: "التقارير"  },
   { href: "/settings", icon: "⚙️", label: "الإعدادات" },
 ] as const;
