@@ -612,8 +612,8 @@ export default function ExpensesPage() {
               </div>
             )}
 
-            {/* ملخص التصنيفات */}
-            {sortedCategories.length > 0 && (
+            {/* ملخص التصنيفات — مخفي أثناء البحث */}
+            {!searchActive && sortedCategories.length > 0 && (
               <div className="mt-4 space-y-2">
                 <p className="text-xs font-semibold text-gray-400 px-1">الإجمالي حسب التصنيف</p>
 
@@ -779,6 +779,30 @@ export default function ExpensesPage() {
             </div>
           )}
 
+          {/* ══ نتائج البحث المفصّلة ══ */}
+          {searchActive && !loading && (
+            <section className="space-y-3">
+              {visibleExpenses.length === 0 ? (
+                <div className="rounded-2xl bg-white p-8 text-center shadow">
+                  <p className="text-4xl">🔍</p>
+                  <p className="mt-3 font-semibold text-gray-600">ما لقينا "{searchQuery.trim()}"</p>
+                  <p className="mt-1 text-sm text-gray-400">جرب كلمة مختلفة</p>
+                </div>
+              ) : (
+                visibleExpenses.map(expense => (
+                  <SearchResultCard
+                    key={expense.id}
+                    expense={expense}
+                    query={searchQuery.trim()}
+                    allCategoryIcons={allCategoryIcons}
+                    onEdit={() => openEdit(expense)}
+                    onDelete={() => void handleDeleteSingle(expense.id)}
+                  />
+                ))
+              )}
+            </section>
+          )}
+
           {/* ── الرسوم البيانية ── */}
           {viewMode === "charts" && !loading && selectedMonthExpenses.length > 0 && (
             <div className="space-y-4">
@@ -794,8 +818,8 @@ export default function ExpensesPage() {
             </div>
           )}
 
-          {/* Expenses list */}
-          <section className={`space-y-3 ${viewMode === "charts" ? "hidden" : ""}`}>
+          {/* Expenses list — مخفي أثناء البحث */}
+          <section className={`space-y-3 ${viewMode === "charts" || searchActive ? "hidden" : ""}`}>
             {loading ? (
               <div className="flex justify-center py-10">
                 <span className="size-8 animate-spin rounded-full border-4 border-white border-t-transparent" />
@@ -1263,6 +1287,167 @@ export default function ExpensesPage() {
         </div>
       )}
     </AuthGuard>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   مكوّن: SearchResultCard — بطاقة نتيجة البحث
+═══════════════════════════════════════════════ */
+function highlightText(text: string, query: string): React.ReactNode {
+  if (!query) return text;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark className="bg-yellow-200 text-yellow-900 rounded px-0.5">{text.slice(idx, idx + query.length)}</mark>
+      {text.slice(idx + query.length)}
+    </>
+  );
+}
+
+function SearchResultCard({
+  expense,
+  query,
+  allCategoryIcons,
+  onEdit,
+  onDelete,
+}: {
+  expense: Expense;
+  query: string;
+  allCategoryIcons: Record<string, string>;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const hasItems = Array.isArray(expense.items) && expense.items.length > 0;
+
+  /* الأصناف التي تطابق البحث */
+  const matchingItems = hasItems
+    ? expense.items!.filter(i => i.name?.toLowerCase().includes(query.toLowerCase()))
+    : [];
+  const otherItems = hasItems
+    ? expense.items!.filter(i => !i.name?.toLowerCase().includes(query.toLowerCase()))
+    : [];
+
+  function toNumber(v: number | string | null): number {
+    if (typeof v === "number") return v;
+    if (typeof v === "string") { const n = Number(v); return isFinite(n) ? n : 0; }
+    return 0;
+  }
+
+  function formatDate(d: string | null): string {
+    if (!d) return "-";
+    const dt = new Date(`${d}T12:00:00+03:00`);
+    if (isNaN(dt.getTime())) return d;
+    return dt.toLocaleDateString("ar-EG-u-nu-latn", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Riyadh", calendar: "gregory" });
+  }
+
+  return (
+    <article className="rounded-2xl bg-white shadow overflow-hidden">
+      {/* الرأس */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-50">
+        <div className="flex size-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#1D9E75]/10 text-xl">
+          {allCategoryIcons[expense.category ?? "أخرى"] ?? "💳"}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-bold text-gray-800 truncate">
+            {highlightText(expense.store ?? "غير محدد", query)}
+          </p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {expense.category ?? "-"} · {formatDate(expense.date)}
+          </p>
+        </div>
+        <div className="flex-shrink-0 text-right">
+          <p className="text-lg font-extrabold text-[#1D9E75] tabular-nums">
+            {toNumber(expense.amount).toFixed(2)}
+            <span className="mr-0.5 text-xs font-normal text-gray-400">ر.س</span>
+          </p>
+        </div>
+      </div>
+
+      {/* الأصناف */}
+      {(hasItems || expense.item_name) && (
+        <div className="px-4 py-3 space-y-1.5">
+
+          {/* صنف واحد */}
+          {!hasItems && expense.item_name && (
+            <div className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2">
+              <span className="text-sm">🏷️</span>
+              <span className="text-sm font-medium text-gray-700">
+                {highlightText(expense.item_name, query)}
+              </span>
+              {expense.item_brand && (
+                <span className="text-xs text-gray-400">· {expense.item_brand}</span>
+              )}
+            </div>
+          )}
+
+          {/* أصناف متعددة — المطابقة أولاً */}
+          {hasItems && (
+            <div className="space-y-1">
+              {matchingItems.length > 0 && (
+                <>
+                  {matchingItems.map((item, idx) => (
+                    <div key={`m-${idx}`} className="flex items-center justify-between rounded-xl bg-yellow-50 border border-yellow-200 px-3 py-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-gray-800">
+                          {highlightText(item.name, query)}
+                        </p>
+                        {item.brand && <p className="text-xs text-gray-400">{item.brand}</p>}
+                        <p className="text-xs text-gray-400">{item.quantity} × {item.unit_price.toFixed(2)} ر.س</p>
+                      </div>
+                      <p className="text-sm font-bold text-[#1D9E75] flex-shrink-0 mr-2 tabular-nums">
+                        {item.total_price.toFixed(2)} ر.س
+                      </p>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {otherItems.length > 0 && (
+                <details className="group">
+                  <summary className="cursor-pointer text-xs text-gray-400 px-1 py-1 list-none flex items-center gap-1 select-none">
+                    <span className="group-open:rotate-90 transition-transform inline-block">▶</span>
+                    {otherItems.length} صنف آخر في هذه الفاتورة
+                  </summary>
+                  <div className="space-y-1 mt-1">
+                    {otherItems.map((item, idx) => (
+                      <div key={`o-${idx}`} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-700 truncate">{item.name}</p>
+                          <p className="text-xs text-gray-400">{item.quantity} × {item.unit_price.toFixed(2)} ر.س</p>
+                        </div>
+                        <p className="text-sm font-semibold text-gray-600 flex-shrink-0 mr-2 tabular-nums">
+                          {item.total_price.toFixed(2)} ر.س
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* أزرار الإجراء */}
+      <div className="flex gap-2 px-4 pb-3">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="flex-1 rounded-xl border border-[#1D9E75]/30 py-2 text-sm font-bold text-[#1D9E75] transition-colors hover:bg-[#1D9E75]/5"
+        >
+          ✏️ تعديل
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="rounded-xl border border-red-200 px-4 py-2 text-sm font-bold text-red-400 transition-colors hover:bg-red-50"
+        >
+          🗑
+        </button>
+      </div>
+    </article>
   );
 }
 
