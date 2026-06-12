@@ -224,64 +224,65 @@ export default function ReportsPage() {
 
               {/* ── التصنيفات — قابلة للتوسيع ── */}
               {sortedCats.length > 0 && (
-                <div className="rounded-3xl bg-white p-5 shadow-lg space-y-1">
-                  <p className="mb-3 text-sm font-bold text-gray-500">الإنفاق حسب التصنيف</p>
+                <div className="rounded-3xl bg-white p-4 shadow-lg">
+                  <p className="mb-2 text-xs font-bold text-gray-400 uppercase tracking-wide">الإجمالي حسب التصنيف</p>
+                  <div className="divide-y divide-gray-50">
                   {sortedCats.map(([cat, { total, count, items }]) => {
-                    const pct       = selectedTotal > 0 ? (total / selectedTotal) * 100 : 0;
-                    const isOpen    = expandedCat === cat;
+                    const pct    = selectedTotal > 0 ? (total / selectedTotal) * 100 : 0;
+                    const isOpen = expandedCat === cat;
                     return (
-                      <div key={cat} className="rounded-2xl overflow-hidden">
-                        {/* رأس التصنيف */}
+                      <div key={cat}>
+                        {/* صف مضغوط */}
                         <button
                           type="button"
                           onClick={() => setExpandedCat(isOpen ? null : cat)}
-                          className={`w-full px-3 py-3 transition-colors ${isOpen ? "bg-[#1D9E75]/8" : "hover:bg-gray-50"}`}
+                          className={`w-full flex items-center gap-2 px-2 py-2.5 transition-colors rounded-xl ${isOpen ? "bg-[#1D9E75]/6" : "hover:bg-gray-50"}`}
                         >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <span>{CATEGORY_ICONS[cat] ?? "💳"}</span>
-                              <span className="text-sm font-semibold text-gray-700">{cat}</span>
-                              <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-1.5 py-0.5">{count}×</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-extrabold text-[#1D9E75]">
-                                {total.toFixed(2)} <span className="text-xs font-normal text-gray-400">ر.س</span>
+                          {/* أيقونة */}
+                          <span className="text-base shrink-0">{CATEGORY_ICONS[cat] ?? "💳"}</span>
+                          {/* اسم + شريط */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-semibold text-gray-700 truncate">{cat}</span>
+                              <span className="text-sm font-extrabold text-[#1D9E75] shrink-0 mr-2">
+                                {total.toFixed(0)}<span className="text-[10px] font-normal text-gray-400"> ر.س</span>
                               </span>
-                              <span className={`text-xs text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}>▼</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 rounded-full bg-gray-100">
+                                <div className="h-1.5 rounded-full bg-[#1D9E75]" style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-[10px] text-gray-400 shrink-0">{pct.toFixed(0)}%</span>
+                              <span className="text-[10px] text-gray-300 shrink-0">·</span>
+                              <span className="text-[10px] text-gray-400 shrink-0">{count}×</span>
                             </div>
                           </div>
-                          <div className="h-2 w-full rounded-full bg-gray-100">
-                            <div className="h-2 rounded-full bg-[#1D9E75] transition-all" style={{ width: `${pct}%` }} />
-                          </div>
-                          <p className="mt-1 text-right text-xs text-gray-400">{pct.toFixed(0)}%</p>
+                          <span className={`text-[10px] text-gray-300 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}>▼</span>
                         </button>
 
-                        {/* قائمة المصاريف داخل التصنيف */}
+                        {/* تفاصيل مضغوطة */}
                         {isOpen && (
-                          <div className="border-t border-[#1D9E75]/10 bg-[#1D9E75]/4 divide-y divide-gray-100">
+                          <div className="mx-2 mb-1 rounded-xl bg-gray-50 divide-y divide-gray-100 overflow-hidden">
                             {items.map((e) => (
-                              <div key={e.id} className="flex items-center justify-between px-4 py-2.5">
+                              <div key={e.id} className="flex items-center justify-between px-3 py-2">
                                 <div className="min-w-0">
-                                  <p className="text-sm font-semibold text-gray-800 truncate">{e.store ?? "غير محدد"}</p>
-                                  <p className="text-xs text-gray-400">{formatDate(e.date)}</p>
+                                  <p className="text-xs font-semibold text-gray-700 truncate">{e.store ?? "غير محدد"}</p>
+                                  <p className="text-[10px] text-gray-400">{formatDate(e.date)}</p>
                                 </div>
-                                <p className="text-sm font-extrabold text-[#1D9E75] shrink-0 mr-3">
-                                  {toNumber(e.amount).toFixed(2)}
-                                  <span className="text-xs font-normal text-gray-400"> ر.س</span>
+                                <p className="text-xs font-extrabold text-[#1D9E75] shrink-0 mr-3">
+                                  {toNumber(e.amount).toFixed(2)}<span className="text-[10px] font-normal text-gray-400"> ر.س</span>
                                 </p>
                               </div>
                             ))}
-                            <div className="flex justify-end px-4 py-2">
-                              <Link href="/add"
-                                className="text-xs font-bold text-[#1D9E75] hover:underline">
-                                + أضف مصروف {cat}
-                              </Link>
+                            <div className="flex justify-end px-3 py-1.5">
+                              <Link href="/add" className="text-[10px] font-bold text-[#1D9E75]">+ أضف</Link>
                             </div>
                           </div>
                         )}
                       </div>
                     );
                   })}
+                  </div>
                 </div>
               )}
 
