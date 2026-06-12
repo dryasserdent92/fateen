@@ -7,6 +7,7 @@ import AuthGuard from "../components/auth-guard";
 import BottomNav from "../components/bottom-nav";
 import { loadSettings, saveSettings, type CustomCategory } from "../../lib/user-settings";
 import { CHANGELOG } from "../../lib/changelog";
+import { apiUrl } from "../../lib/api-client";
 
 const EMOJI_PRESETS = ["🏠","🎓","✈️","🎮","🐾","💼","🍕","🎵","📚","🎨","🔧","💇","🎁","🏖️","💊","☎️","🧴","🛁","⚽","🌿"];
 
@@ -19,6 +20,13 @@ export default function SettingsPage() {
   const [startDay, setStartDay] = useState<number>(1);
   const [budget, setBudget] = useState<number>(0);
   const [settingsSaved, setSettingsSaved] = useState(false);
+
+  /* دمج التصنيفات */
+  const [mergeFrom, setMergeFrom] = useState("");
+  const [mergeTo, setMergeTo] = useState("");
+  const [mergeLoading, setMergeLoading] = useState(false);
+  const [mergeResult, setMergeResult] = useState<{ updated: number; to: string } | null>(null);
+  const [mergeError, setMergeError] = useState<string | null>(null);
 
   /* التصنيفات المخصصة */
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
@@ -62,6 +70,26 @@ export default function SettingsPage() {
     const updated = customCategories.filter((_, i) => i !== idx);
     setCustomCategories(updated);
     saveSettings({ startDay, budget, customCategories: updated });
+  }
+
+  async function handleMergeCategories() {
+    const froms = mergeFrom.split(",").map(s => s.trim()).filter(Boolean);
+    if (!froms.length || !mergeTo.trim()) return;
+    setMergeLoading(true); setMergeResult(null); setMergeError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { "Content-Type": "application/json",
+        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) };
+      const res = await fetch(apiUrl("/api/merge-category"), {
+        method: "POST", headers,
+        body: JSON.stringify({ from: froms, to: mergeTo.trim() }),
+      });
+      const json = (await res.json()) as { updated?: number; to?: string; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "فشل الدمج");
+      setMergeResult({ updated: json.updated ?? 0, to: json.to ?? mergeTo.trim() });
+      setMergeFrom(""); setMergeTo("");
+    } catch (e) { setMergeError(e instanceof Error ? e.message : "خطأ"); }
+    finally { setMergeLoading(false); }
   }
 
   async function handleLogout() {
@@ -147,6 +175,58 @@ export default function SettingsPage() {
             >
               {settingsSaved ? "✅ تم الحفظ!" : "حفظ الإعدادات"}
             </button>
+          </div>
+
+          {/* ── دمج التصنيفات ── */}
+          <div className="rounded-3xl bg-white p-5 shadow-lg space-y-4">
+            <p className="text-xs font-bold text-gray-400 px-1">🔀 دمج التصنيفات</p>
+
+            {mergeResult && (
+              <div className="rounded-2xl bg-green-50 border border-green-200 px-4 py-3">
+                <p className="text-sm font-bold text-green-700">
+                  ✅ تم تحديث {mergeResult.updated} مصروف إلى "{mergeResult.to}"
+                </p>
+              </div>
+            )}
+            {mergeError && (
+              <div className="rounded-2xl bg-red-50 border border-red-200 px-4 py-3">
+                <p className="text-sm text-red-600">{mergeError}</p>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-sm font-semibold text-gray-700">التصنيفات المراد دمجها</label>
+                <p className="text-xs text-gray-400">افصل بين التصنيفات بفاصلة — مثال: بنزيني، بنزين السواق</p>
+                <input
+                  type="text"
+                  value={mergeFrom}
+                  onChange={e => setMergeFrom(e.target.value)}
+                  placeholder="بنزيني، بنزين السواق"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-800 outline-none focus:border-[#1D9E75] focus:ring-1 focus:ring-[#1D9E75]"
+                  dir="rtl"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-semibold text-gray-700">الاسم الجديد</label>
+                <input
+                  type="text"
+                  value={mergeTo}
+                  onChange={e => setMergeTo(e.target.value)}
+                  placeholder="البنزين"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-800 outline-none focus:border-[#1D9E75] focus:ring-1 focus:ring-[#1D9E75]"
+                  dir="rtl"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleMergeCategories()}
+                disabled={!mergeFrom.trim() || !mergeTo.trim() || mergeLoading}
+                className="w-full rounded-2xl bg-[#1D9E75] py-3 text-sm font-bold text-white shadow disabled:opacity-40 transition-opacity hover:opacity-90"
+              >
+                {mergeLoading ? "⏳ جاري الدمج..." : "🔀 دمج التصنيفات"}
+              </button>
+            </div>
           </div>
 
           {/* ── التصنيفات المخصصة ── */}
