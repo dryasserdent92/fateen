@@ -646,56 +646,93 @@ export default function ExpensesPage() {
               </div>
             )}
 
-            {/* ملخص التصنيفات — مخفي أثناء البحث */}
-            {!searchActive && sortedCategories.length > 0 && (
-              <div className="mt-4 space-y-2">
-                <p className="text-xs font-semibold text-gray-400 px-1">الإجمالي حسب التصنيف</p>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {sortedCategories.map(([cat, { total, count }]) => {
-                    const pct = currentMonthTotal > 0 ? (total / currentMonthTotal) * 100 : 0;
-                    const isActive = filterCategory === cat;
-                    return (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => {
-                          setFilterCategory(isActive ? null : cat);
-                          setSelectMode(false);
-                          setSelected(new Set());
-                        }}
-                        className={`rounded-2xl px-3 py-2.5 text-right transition-all ${
-                          isActive
-                            ? "bg-[#1D9E75] ring-2 ring-[#1D9E75]"
-                            : "bg-[#1D9E75]/5 hover:bg-[#1D9E75]/10"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-base">{allCategoryIcons[cat] ?? "💳"}</span>
-                            <span className={`text-xs font-semibold truncate ${isActive ? "text-white" : "text-gray-600"}`}>{cat}</span>
-                          </div>
-                          <span className={`text-xs font-bold rounded-full px-1.5 py-0.5 ${isActive ? "bg-white/20 text-white" : "bg-gray-100 text-gray-400"}`}>
-                            {count}×
-                          </span>
-                        </div>
-                        <p className={`text-lg font-extrabold ${isActive ? "text-white" : "text-[#1D9E75]"}`}>
-                          {total.toFixed(2)}
-                          <span className={`mr-0.5 text-xs font-normal ${isActive ? "text-white/70" : "text-gray-400"}`}>ر.س</span>
-                        </p>
-                        <div className={`mt-1.5 h-1.5 w-full rounded-full ${isActive ? "bg-white/20" : "bg-[#1D9E75]/15"}`}>
-                          <div
-                            className={`h-1.5 rounded-full ${isActive ? "bg-white" : "bg-[#1D9E75]"}`}
-                            style={{ width: `${pct}%` }}
+            {/* ── دائرة التصنيفات ── */}
+            {!searchActive && sortedCategories.length > 0 && (() => {
+              const PALETTE = [
+                "#1D9E75","#3b82f6","#f59e0b","#ef4444","#8b5cf6",
+                "#ec4899","#06b6d4","#84cc16","#f97316","#6366f1",
+                "#14b8a6","#e11d48",
+              ];
+              const R = 62; const CX = 80; const CY = 80;
+              const circumference = 2 * Math.PI * R;
+              let offset = 0;
+              const slices = sortedCategories.map(([cat, { total, count }], i) => {
+                const pct   = currentMonthTotal > 0 ? total / currentMonthTotal : 0;
+                const dash  = pct * circumference;
+                const slice = { cat, total, count, pct, dash, offset, color: PALETTE[i % PALETTE.length]! };
+                offset += dash;
+                return slice;
+              });
+              return (
+                <div className="mt-4 rounded-2xl bg-white/10 p-3">
+                  {filterCategory && (
+                    <p className="text-[10px] text-white/60 text-center mb-2">
+                      فلتر: <strong className="text-white">{filterCategory}</strong>
+                      {" · "}
+                      <button type="button" onClick={() => setFilterCategory(null)} className="underline">إلغاء</button>
+                    </p>
+                  )}
+                  <div className="flex items-center gap-3">
+                    {/* دائرة SVG */}
+                    <div className="shrink-0">
+                      <svg width="160" height="160" viewBox="0 0 160 160">
+                        <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="20"/>
+                        {slices.map((s) => (
+                          <circle
+                            key={s.cat}
+                            cx={CX} cy={CY} r={R}
+                            fill="none"
+                            stroke={s.color}
+                            strokeWidth="20"
+                            strokeDasharray={`${s.dash - 1.5} ${circumference - s.dash + 1.5}`}
+                            strokeDashoffset={-s.offset + circumference * 0.25}
+                            strokeLinecap="butt"
+                            style={{ opacity: filterCategory && filterCategory !== s.cat ? 0.3 : 1, transition: "opacity .2s" }}
                           />
-                        </div>
-                        <p className={`mt-0.5 text-xs ${isActive ? "text-white/70" : "text-gray-400"}`}>{pct.toFixed(0)}%</p>
-                      </button>
-                    );
-                  })}
+                        ))}
+                        <text x={CX} y={CY - 5} textAnchor="middle" fontSize="14" fontWeight="900" fill="white" fontFamily="Tajawal">
+                          {currentMonthTotal.toFixed(0)}
+                        </text>
+                        <text x={CX} y={CY + 12} textAnchor="middle" fontSize="8.5" fill="rgba(255,255,255,0.6)" fontFamily="Tajawal">
+                          ر.س
+                        </text>
+                      </svg>
+                    </div>
+                    {/* legend مضغوط */}
+                    <div className="flex-1 min-w-0 space-y-1">
+                      {slices.map((s) => {
+                        const isActive = filterCategory === s.cat;
+                        return (
+                          <button
+                            key={s.cat}
+                            type="button"
+                            onClick={() => {
+                              setFilterCategory(isActive ? null : s.cat);
+                              setSelectMode(false);
+                              setSelected(new Set());
+                            }}
+                            className={`w-full flex items-center gap-2 rounded-xl px-2 py-1.5 transition-all text-right ${
+                              isActive ? "bg-white/20 ring-1 ring-white/40" : "hover:bg-white/10"
+                            }`}
+                          >
+                            <span className="shrink-0 w-2 h-2 rounded-full" style={{ background: s.color }}/>
+                            <span className="flex-1 min-w-0 text-xs font-semibold text-white truncate">
+                              {allCategoryIcons[s.cat] ?? ""} {s.cat}
+                            </span>
+                            <span className="shrink-0 text-xs font-extrabold text-white">
+                              {s.total.toFixed(0)}
+                            </span>
+                            <span className="shrink-0 text-[10px] text-white/50 w-6 text-left">
+                              {s.pct > 0 ? `${(s.pct * 100).toFixed(0)}%` : ""}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {error && (
               <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
