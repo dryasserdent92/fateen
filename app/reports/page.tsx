@@ -276,69 +276,116 @@ export default function ReportsPage() {
                 <p className="mt-1 text-xs text-gray-400">{selectedExpenses.length} عملية</p>
               </div>
 
-              {/* ── التصنيفات — قابلة للتوسيع ── */}
-              {sortedCats.length > 0 && (
-                <div className="rounded-3xl bg-white p-4 shadow-lg">
-                  <p className="mb-2 text-xs font-bold text-gray-400 uppercase tracking-wide">الإجمالي حسب التصنيف</p>
-                  <div className="divide-y divide-gray-50">
-                  {sortedCats.map(([cat, { total, count, items }]) => {
-                    const pct    = selectedTotal > 0 ? (total / selectedTotal) * 100 : 0;
-                    const isOpen = expandedCat === cat;
-                    return (
-                      <div key={cat}>
-                        {/* صف مضغوط */}
-                        <button
-                          type="button"
-                          onClick={() => setExpandedCat(isOpen ? null : cat)}
-                          className={`w-full flex items-center gap-2 px-2 py-2.5 transition-colors rounded-xl ${isOpen ? "bg-[#1D9E75]/6" : "hover:bg-gray-50"}`}
-                        >
-                          {/* أيقونة */}
-                          <span className="text-base shrink-0">{CATEGORY_ICONS[cat] ?? "💳"}</span>
-                          {/* اسم + شريط */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm font-semibold text-gray-700 truncate">{cat}</span>
-                              <span className="text-sm font-extrabold text-[#1D9E75] shrink-0 mr-2">
-                                {total.toFixed(0)}<span className="text-[10px] font-normal text-gray-400"> ر.س</span>
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 h-1.5 rounded-full bg-gray-100">
-                                <div className="h-1.5 rounded-full bg-[#1D9E75]" style={{ width: `${pct}%` }} />
-                              </div>
-                              <span className="text-[10px] text-gray-400 shrink-0">{pct.toFixed(0)}%</span>
-                              <span className="text-[10px] text-gray-300 shrink-0">·</span>
-                              <span className="text-[10px] text-gray-400 shrink-0">{count}×</span>
-                            </div>
-                          </div>
-                          <span className={`text-[10px] text-gray-300 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}>▼</span>
-                        </button>
+              {/* ── دائرة التصنيفات ── */}
+              {sortedCats.length > 0 && (() => {
+                const PALETTE = [
+                  "#1D9E75","#3b82f6","#f59e0b","#ef4444","#8b5cf6",
+                  "#ec4899","#06b6d4","#84cc16","#f97316","#6366f1",
+                  "#14b8a6","#e11d48",
+                ];
+                // حساب شرائح الدائرة
+                const R = 70; const CX = 90; const CY = 90;
+                const circumference = 2 * Math.PI * R;
+                let offset = 0;
+                const slices = sortedCats.map(([cat, { total }], i) => {
+                  const pct   = selectedTotal > 0 ? total / selectedTotal : 0;
+                  const dash  = pct * circumference;
+                  const gap   = circumference - dash;
+                  const slice = { cat, total, pct, dash, gap, offset, color: PALETTE[i % PALETTE.length]! };
+                  offset += dash;
+                  return slice;
+                });
 
-                        {/* تفاصيل مضغوطة */}
-                        {isOpen && (
-                          <div className="mx-2 mb-1 rounded-xl bg-gray-50 divide-y divide-gray-100 overflow-hidden">
-                            {items.map((e) => (
-                              <div key={e.id} className="flex items-center justify-between px-3 py-2">
-                                <div className="min-w-0">
-                                  <p className="text-xs font-semibold text-gray-700 truncate">{e.store ?? "غير محدد"}</p>
-                                  <p className="text-[10px] text-gray-400">{formatDate(e.date)}</p>
-                                </div>
-                                <p className="text-xs font-extrabold text-[#1D9E75] shrink-0 mr-3">
-                                  {toNumber(e.amount).toFixed(2)}<span className="text-[10px] font-normal text-gray-400"> ر.س</span>
-                                </p>
-                              </div>
-                            ))}
-                            <div className="flex justify-end px-3 py-1.5">
-                              <Link href="/add" className="text-[10px] font-bold text-[#1D9E75]">+ أضف</Link>
-                            </div>
-                          </div>
-                        )}
+                return (
+                  <div className="rounded-3xl bg-white p-5 shadow-lg">
+                    <p className="mb-4 text-xs font-bold text-gray-400 uppercase tracking-wide">الإجمالي حسب التصنيف</p>
+
+                    {/* دائرة SVG */}
+                    <div className="flex items-center gap-5">
+                      <div className="shrink-0">
+                        <svg width="180" height="180" viewBox="0 0 180 180">
+                          {/* خلفية */}
+                          <circle cx={CX} cy={CY} r={R} fill="none" stroke="#f3f4f6" strokeWidth="22"/>
+                          {/* الشرائح */}
+                          {slices.map((s) => (
+                            <circle
+                              key={s.cat}
+                              cx={CX} cy={CY} r={R}
+                              fill="none"
+                              stroke={s.color}
+                              strokeWidth="22"
+                              strokeDasharray={`${s.dash - 1.5} ${circumference - s.dash + 1.5}`}
+                              strokeDashoffset={-s.offset + circumference * 0.25}
+                              strokeLinecap="butt"
+                              style={{ transition: "stroke-dasharray .4s" }}
+                            />
+                          ))}
+                          {/* نص وسط */}
+                          <text x={CX} y={CY - 6} textAnchor="middle" fontSize="15" fontWeight="900" fill="#0f172a" fontFamily="Tajawal">
+                            {selectedTotal.toFixed(0)}
+                          </text>
+                          <text x={CX} y={CY + 12} textAnchor="middle" fontSize="9" fill="#94a3b8" fontFamily="Tajawal">
+                            ر.س
+                          </text>
+                        </svg>
                       </div>
-                    );
-                  })}
+
+                      {/* legend مضغوط */}
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        {slices.map((s) => (
+                          <button
+                            key={s.cat}
+                            type="button"
+                            onClick={() => setExpandedCat(expandedCat === s.cat ? null : s.cat)}
+                            className={`w-full flex items-center gap-2 rounded-xl px-2 py-1.5 transition-colors text-right ${
+                              expandedCat === s.cat ? "bg-gray-50" : "hover:bg-gray-50"
+                            }`}
+                          >
+                            <span className="shrink-0 w-2.5 h-2.5 rounded-full" style={{ background: s.color }}/>
+                            <span className="flex-1 min-w-0 text-xs font-semibold text-gray-700 truncate">
+                              {CATEGORY_ICONS[s.cat] ?? ""} {s.cat}
+                            </span>
+                            <span className="shrink-0 text-xs font-extrabold" style={{ color: s.color }}>
+                              {s.total.toFixed(0)}
+                            </span>
+                            <span className="shrink-0 text-[10px] text-gray-400 w-7 text-left">
+                              {s.pct > 0 ? `${(s.pct * 100).toFixed(0)}%` : ""}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* تفاصيل التصنيف المختار */}
+                    {expandedCat && (() => {
+                      const entry = sortedCats.find(([c]) => c === expandedCat);
+                      if (!entry) return null;
+                      const [cat, { items }] = entry;
+                      return (
+                        <div className="mt-4 rounded-2xl bg-gray-50 divide-y divide-gray-100 overflow-hidden">
+                          <p className="px-3 py-2 text-xs font-bold text-gray-500">
+                            {CATEGORY_ICONS[cat] ?? "💳"} {cat} — التفاصيل
+                          </p>
+                          {items.map((e) => (
+                            <div key={e.id} className="flex items-center justify-between px-3 py-2">
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-gray-700 truncate">{e.store ?? "غير محدد"}</p>
+                                <p className="text-[10px] text-gray-400">{formatDate(e.date)}</p>
+                              </div>
+                              <p className="text-xs font-extrabold text-[#1D9E75] shrink-0 mr-3">
+                                {toNumber(e.amount).toFixed(2)}<span className="text-[10px] font-normal text-gray-400"> ر.س</span>
+                              </p>
+                            </div>
+                          ))}
+                          <div className="flex justify-end px-3 py-1.5">
+                            <Link href="/add" className="text-[10px] font-bold text-[#1D9E75]">+ أضف</Link>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* ── تحليل التصنيف عبر الأشهر ── */}
               {allCategories.length > 0 && (
