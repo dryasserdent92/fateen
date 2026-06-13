@@ -70,6 +70,9 @@ export default function ReportsPage() {
   const [expandedCat, setExpandedCat]     = useState<string | null>(null);
   const [expandedStore, setExpandedStore] = useState<string | null>(null);
 
+  /* تحليل التصنيف */
+  const [analysisCat, setAnalysisCat]     = useState<string>("البنزين");
+
   useEffect(() => { void fetchExpenses(); }, []);
 
   async function fetchExpenses() {
@@ -155,6 +158,35 @@ export default function ReportsPage() {
     setExpandedCat(null);
     setExpandedStore(null);
   }
+
+  /* ── تحليل التصنيف عبر الأشهر ── */
+  const allCategories = Array.from(
+    new Set(expenses.map((e) => e.category ?? "أخرى"))
+  ).sort();
+
+  const catMonthlyData = months.map(({ year, month, label }) => {
+    const total = expenses
+      .filter((e) => {
+        if (!e.date) return false;
+        const d = new Date(`${e.date}T12:00:00+03:00`);
+        return (
+          d.getFullYear() === year &&
+          d.getMonth() === month &&
+          (e.category ?? "أخرى") === analysisCat
+        );
+      })
+      .reduce((sum, e) => sum + toNumber(e.amount), 0);
+    return { year, month, label, total };
+  });
+
+  const catMax    = Math.max(...catMonthlyData.map((m) => m.total), 1);
+  const catPeak   = catMonthlyData.reduce((a, b) => (b.total > a.total ? b : a), catMonthlyData[0]!);
+  const catLowest = catMonthlyData.filter((m) => m.total > 0).reduce(
+    (a, b) => (b.total < a.total ? b : a),
+    catMonthlyData.filter((m) => m.total > 0)[0] ?? catMonthlyData[0]!
+  );
+  const catAvg    = catMonthlyData.filter((m) => m.total > 0).reduce((s, m) => s + m.total, 0) /
+                    Math.max(catMonthlyData.filter((m) => m.total > 0).length, 1);
 
   return (
     <AuthGuard>
@@ -283,6 +315,113 @@ export default function ReportsPage() {
                     );
                   })}
                   </div>
+                </div>
+              )}
+
+              {/* ── تحليل التصنيف عبر الأشهر ── */}
+              {allCategories.length > 0 && (
+                <div className="rounded-3xl bg-white p-5 shadow-lg space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-bold text-gray-700">📈 تحليل التصنيف</p>
+                    <span className="text-xs text-gray-400">آخر 6 أشهر</span>
+                  </div>
+
+                  {/* اختيار التصنيف */}
+                  <div className="flex flex-wrap gap-2">
+                    {allCategories.map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setAnalysisCat(cat)}
+                        className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                          analysisCat === cat
+                            ? "bg-[#1D9E75] text-white shadow-md"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        }`}
+                      >
+                        <span>{CATEGORY_ICONS[cat] ?? "💳"}</span>
+                        <span>{cat}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* مخطط الأشهر */}
+                  {catPeak.total > 0 ? (
+                    <>
+                      <div className="flex items-end justify-between gap-1.5 h-28">
+                        {catMonthlyData.map(({ year, month, label, total }) => {
+                          const heightPct = catMax > 0 ? (total / catMax) * 100 : 0;
+                          const isPeak    = total === catPeak.total && total > 0;
+                          const isLowest  = total === catLowest.total && total > 0 && total !== catPeak.total;
+                          return (
+                            <div key={`${year}-${month}`} className="flex flex-1 flex-col items-center gap-1">
+                              {isPeak && (
+                                <span className="text-[9px] font-bold text-orange-500">🔺أعلى</span>
+                              )}
+                              {isLowest && (
+                                <span className="text-[9px] font-bold text-[#1D9E75]">✓أدنى</span>
+                              )}
+                              {!isPeak && !isLowest && (
+                                <span className="text-[9px] text-transparent">-</span>
+                              )}
+                              <span className={`text-[10px] font-bold ${isPeak ? "text-orange-500" : "text-gray-400"}`}>
+                                {total > 0 ? total.toFixed(0) : ""}
+                              </span>
+                              <div className="w-full flex items-end justify-center" style={{ height: "68px" }}>
+                                <div
+                                  className={`w-full rounded-t-lg transition-all ${
+                                    isPeak
+                                      ? "bg-orange-400"
+                                      : isLowest
+                                      ? "bg-[#1D9E75]"
+                                      : "bg-[#1D9E75]/30"
+                                  }`}
+                                  style={{ height: `${Math.max(heightPct, total > 0 ? 6 : 0)}%` }}
+                                />
+                              </div>
+                              <span className="text-[10px] text-gray-400">{label.slice(0, 3)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* ملخص ذكي */}
+                      <div className="rounded-2xl bg-[#1D9E75]/6 border border-[#1D9E75]/15 p-4 space-y-2">
+                        <p className="text-xs font-extrabold text-[#1D9E75]">
+                          {CATEGORY_ICONS[analysisCat] ?? "💳"} {analysisCat} — ملخص 6 أشهر
+                        </p>
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          <div className="rounded-xl bg-orange-50 p-2">
+                            <p className="text-xs font-extrabold text-orange-500">{catPeak.total.toFixed(0)}</p>
+                            <p className="text-[10px] text-gray-400">أعلى شهر</p>
+                            <p className="text-[10px] font-bold text-orange-400">{catPeak.label}</p>
+                          </div>
+                          <div className="rounded-xl bg-[#1D9E75]/8 p-2">
+                            <p className="text-xs font-extrabold text-[#1D9E75]">{catAvg.toFixed(0)}</p>
+                            <p className="text-[10px] text-gray-400">المتوسط</p>
+                            <p className="text-[10px] font-bold text-[#1D9E75]">ر.س/شهر</p>
+                          </div>
+                          <div className="rounded-xl bg-blue-50 p-2">
+                            <p className="text-xs font-extrabold text-blue-500">{catLowest.total.toFixed(0)}</p>
+                            <p className="text-[10px] text-gray-400">أدنى شهر</p>
+                            <p className="text-[10px] font-bold text-blue-400">{catLowest.label}</p>
+                          </div>
+                        </div>
+                        {catPeak.total > catAvg * 1.3 && (
+                          <p className="text-[11px] text-gray-500 mt-1">
+                            ⚠️ شهر <strong className="text-orange-500">{catPeak.label}</strong> أعلى من المتوسط بنسبة{" "}
+                            <strong className="text-orange-500">
+                              {(((catPeak.total - catAvg) / catAvg) * 100).toFixed(0)}%
+                            </strong>
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-center text-sm text-gray-400 py-4">
+                      لا توجد بيانات لـ &quot;{analysisCat}&quot; في الأشهر الستة الماضية
+                    </p>
+                  )}
                 </div>
               )}
 
