@@ -71,7 +71,9 @@ export default function ReportsPage() {
   const [expandedStore, setExpandedStore] = useState<string | null>(null);
 
   /* تحليل التصنيف */
-  const [analysisCat, setAnalysisCat]     = useState<string>("البنزين");
+  const [analysisCat, setAnalysisCat]     = useState<string>("بنزيني");
+  const [compareMode, setCompareMode]     = useState<boolean>(false);
+  const [compareCat2, setCompareCat2]     = useState<string>("بنزين السواق");
 
   useEffect(() => { void fetchExpenses(); }, []);
 
@@ -187,6 +189,26 @@ export default function ReportsPage() {
   );
   const catAvg    = catMonthlyData.filter((m) => m.total > 0).reduce((s, m) => s + m.total, 0) /
                     Math.max(catMonthlyData.filter((m) => m.total > 0).length, 1);
+
+  /* بيانات التصنيف الثاني للمقارنة */
+  const cat2MonthlyData = months.map(({ year, month, label }) => {
+    const total = expenses
+      .filter((e) => {
+        if (!e.date) return false;
+        const d = new Date(`${e.date}T12:00:00+03:00`);
+        return (
+          d.getFullYear() === year &&
+          d.getMonth() === month &&
+          (e.category ?? "أخرى") === compareCat2
+        );
+      })
+      .reduce((sum, e) => sum + toNumber(e.amount), 0);
+    return { year, month, label, total };
+  });
+
+  const compareMax   = Math.max(...catMonthlyData.map((m) => m.total), ...cat2MonthlyData.map((m) => m.total), 1);
+  const cat1Total6   = catMonthlyData.reduce((s, m) => s + m.total, 0);
+  const cat2Total6   = cat2MonthlyData.reduce((s, m) => s + m.total, 0);
 
   return (
     <AuthGuard>
@@ -321,106 +343,226 @@ export default function ReportsPage() {
               {/* ── تحليل التصنيف عبر الأشهر ── */}
               {allCategories.length > 0 && (
                 <div className="rounded-3xl bg-white p-5 shadow-lg space-y-4">
+
+                  {/* رأس البطاقة + تبديل الوضع */}
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-bold text-gray-700">📈 تحليل التصنيف</p>
-                    <span className="text-xs text-gray-400">آخر 6 أشهر</span>
+                    <button
+                      type="button"
+                      onClick={() => setCompareMode(!compareMode)}
+                      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                        compareMode ? "bg-purple-500 text-white" : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      ⚖️ {compareMode ? "وضع المقارنة" : "قارن تصنيفين"}
+                    </button>
                   </div>
 
-                  {/* اختيار التصنيف */}
-                  <div className="flex flex-wrap gap-2">
-                    {allCategories.map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setAnalysisCat(cat)}
-                        className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
-                          analysisCat === cat
-                            ? "bg-[#1D9E75] text-white shadow-md"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        }`}
-                      >
-                        <span>{CATEGORY_ICONS[cat] ?? "💳"}</span>
-                        <span>{cat}</span>
-                      </button>
-                    ))}
+                  {/* اختيار التصنيف الأول */}
+                  <div>
+                    {compareMode && (
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="w-3 h-3 rounded-full bg-[#1D9E75] shrink-0"/>
+                        <p className="text-[11px] font-bold text-gray-500">التصنيف الأول</p>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      {allCategories.map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setAnalysisCat(cat)}
+                          className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                            analysisCat === cat
+                              ? "bg-[#1D9E75] text-white shadow-md"
+                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          }`}
+                        >
+                          <span>{CATEGORY_ICONS[cat] ?? "💳"}</span>
+                          <span>{cat}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
-                  {/* مخطط الأشهر */}
-                  {catPeak.total > 0 ? (
+                  {/* اختيار التصنيف الثاني — في وضع المقارنة فقط */}
+                  {compareMode && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="w-3 h-3 rounded-full bg-purple-400 shrink-0"/>
+                        <p className="text-[11px] font-bold text-gray-500">التصنيف الثاني</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {allCategories.filter((c) => c !== analysisCat).map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setCompareCat2(cat)}
+                            className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                              compareCat2 === cat
+                                ? "bg-purple-500 text-white shadow-md"
+                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            }`}
+                          >
+                            <span>{CATEGORY_ICONS[cat] ?? "💳"}</span>
+                            <span>{cat}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ══ وضع المقارنة: أعمدة مزدوجة ══ */}
+                  {compareMode ? (
                     <>
-                      <div className="flex items-end justify-between gap-1.5 h-28">
-                        {catMonthlyData.map(({ year, month, label, total }) => {
-                          const heightPct = catMax > 0 ? (total / catMax) * 100 : 0;
-                          const isPeak    = total === catPeak.total && total > 0;
-                          const isLowest  = total === catLowest.total && total > 0 && total !== catPeak.total;
+                      <div className="flex items-end justify-between gap-1 h-32">
+                        {catMonthlyData.map(({ year, month, label, total }, i) => {
+                          const t2          = cat2MonthlyData[i]?.total ?? 0;
+                          const h1          = compareMax > 0 ? (total / compareMax) * 100 : 0;
+                          const h2          = compareMax > 0 ? (t2    / compareMax) * 100 : 0;
                           return (
-                            <div key={`${year}-${month}`} className="flex flex-1 flex-col items-center gap-1">
-                              {isPeak && (
-                                <span className="text-[9px] font-bold text-orange-500">🔺أعلى</span>
-                              )}
-                              {isLowest && (
-                                <span className="text-[9px] font-bold text-[#1D9E75]">✓أدنى</span>
-                              )}
-                              {!isPeak && !isLowest && (
-                                <span className="text-[9px] text-transparent">-</span>
-                              )}
-                              <span className={`text-[10px] font-bold ${isPeak ? "text-orange-500" : "text-gray-400"}`}>
-                                {total > 0 ? total.toFixed(0) : ""}
-                              </span>
-                              <div className="w-full flex items-end justify-center" style={{ height: "68px" }}>
-                                <div
-                                  className={`w-full rounded-t-lg transition-all ${
-                                    isPeak
-                                      ? "bg-orange-400"
-                                      : isLowest
-                                      ? "bg-[#1D9E75]"
-                                      : "bg-[#1D9E75]/30"
-                                  }`}
-                                  style={{ height: `${Math.max(heightPct, total > 0 ? 6 : 0)}%` }}
-                                />
+                            <div key={`${year}-${month}`} className="flex flex-1 flex-col items-center gap-0.5">
+                              {/* أرقام صغيرة */}
+                              <div className="flex gap-0.5 text-[8px] font-bold w-full justify-center">
+                                {total > 0 && <span className="text-[#1D9E75]">{total.toFixed(0)}</span>}
+                                {total > 0 && t2 > 0 && <span className="text-gray-300">/</span>}
+                                {t2    > 0 && <span className="text-purple-400">{t2.toFixed(0)}</span>}
                               </div>
-                              <span className="text-[10px] text-gray-400">{label.slice(0, 3)}</span>
+                              {/* أعمدة مزدوجة */}
+                              <div className="flex gap-0.5 items-end w-full" style={{ height: "80px" }}>
+                                <div className="flex-1 rounded-t-md bg-[#1D9E75]/80 transition-all"
+                                  style={{ height: `${Math.max(h1, total > 0 ? 4 : 0)}%` }} />
+                                <div className="flex-1 rounded-t-md bg-purple-400/80 transition-all"
+                                  style={{ height: `${Math.max(h2, t2 > 0 ? 4 : 0)}%` }} />
+                              </div>
+                              <span className="text-[9px] text-gray-400">{label.slice(0, 3)}</span>
                             </div>
                           );
                         })}
                       </div>
 
-                      {/* ملخص ذكي */}
-                      <div className="rounded-2xl bg-[#1D9E75]/6 border border-[#1D9E75]/15 p-4 space-y-2">
-                        <p className="text-xs font-extrabold text-[#1D9E75]">
-                          {CATEGORY_ICONS[analysisCat] ?? "💳"} {analysisCat} — ملخص 6 أشهر
-                        </p>
-                        <div className="grid grid-cols-3 gap-2 text-center">
-                          <div className="rounded-xl bg-orange-50 p-2">
-                            <p className="text-xs font-extrabold text-orange-500">{catPeak.total.toFixed(0)}</p>
-                            <p className="text-[10px] text-gray-400">أعلى شهر</p>
-                            <p className="text-[10px] font-bold text-orange-400">{catPeak.label}</p>
+                      {/* وسيلة إيضاح */}
+                      <div className="flex items-center justify-center gap-5 text-xs">
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-3 h-3 rounded-sm bg-[#1D9E75]"/>
+                          <span className="font-bold text-gray-700">{analysisCat}</span>
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-3 h-3 rounded-sm bg-purple-400"/>
+                          <span className="font-bold text-gray-700">{compareCat2}</span>
+                        </span>
+                      </div>
+
+                      {/* ملخص المقارنة */}
+                      <div className="rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-3">
+                        <p className="text-xs font-extrabold text-gray-600">ملخص المقارنة — 6 أشهر</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          {/* التصنيف 1 */}
+                          <div className="rounded-xl bg-[#1D9E75]/8 border border-[#1D9E75]/15 p-3 text-center">
+                            <p className="text-[10px] font-bold text-[#1D9E75] mb-1">
+                              {CATEGORY_ICONS[analysisCat] ?? "💳"} {analysisCat}
+                            </p>
+                            <p className="text-lg font-extrabold text-[#1D9E75]">{cat1Total6.toFixed(0)}</p>
+                            <p className="text-[10px] text-gray-400">ر.س إجمالي</p>
+                            <p className="text-[10px] text-gray-500 mt-1">
+                              متوسط: {(cat1Total6 / 6).toFixed(0)} ر.س/شهر
+                            </p>
                           </div>
-                          <div className="rounded-xl bg-[#1D9E75]/8 p-2">
-                            <p className="text-xs font-extrabold text-[#1D9E75]">{catAvg.toFixed(0)}</p>
-                            <p className="text-[10px] text-gray-400">المتوسط</p>
-                            <p className="text-[10px] font-bold text-[#1D9E75]">ر.س/شهر</p>
-                          </div>
-                          <div className="rounded-xl bg-blue-50 p-2">
-                            <p className="text-xs font-extrabold text-blue-500">{catLowest.total.toFixed(0)}</p>
-                            <p className="text-[10px] text-gray-400">أدنى شهر</p>
-                            <p className="text-[10px] font-bold text-blue-400">{catLowest.label}</p>
+                          {/* التصنيف 2 */}
+                          <div className="rounded-xl bg-purple-50 border border-purple-100 p-3 text-center">
+                            <p className="text-[10px] font-bold text-purple-500 mb-1">
+                              {CATEGORY_ICONS[compareCat2] ?? "💳"} {compareCat2}
+                            </p>
+                            <p className="text-lg font-extrabold text-purple-500">{cat2Total6.toFixed(0)}</p>
+                            <p className="text-[10px] text-gray-400">ر.س إجمالي</p>
+                            <p className="text-[10px] text-gray-500 mt-1">
+                              متوسط: {(cat2Total6 / 6).toFixed(0)} ر.س/شهر
+                            </p>
                           </div>
                         </div>
-                        {catPeak.total > catAvg * 1.3 && (
-                          <p className="text-[11px] text-gray-500 mt-1">
-                            ⚠️ شهر <strong className="text-orange-500">{catPeak.label}</strong> أعلى من المتوسط بنسبة{" "}
-                            <strong className="text-orange-500">
-                              {(((catPeak.total - catAvg) / catAvg) * 100).toFixed(0)}%
-                            </strong>
-                          </p>
+                        {/* من يصرف أكثر؟ */}
+                        {(cat1Total6 > 0 || cat2Total6 > 0) && (
+                          <div className={`rounded-xl p-3 text-center text-xs font-bold ${
+                            cat1Total6 > cat2Total6 ? "bg-[#1D9E75]/10 text-[#1D9E75]" : "bg-purple-50 text-purple-600"
+                          }`}>
+                            {cat1Total6 > cat2Total6
+                              ? `${CATEGORY_ICONS[analysisCat] ?? "💳"} ${analysisCat} أعلى بـ ${(cat1Total6 - cat2Total6).toFixed(0)} ر.س خلال 6 أشهر`
+                              : cat2Total6 > cat1Total6
+                              ? `${CATEGORY_ICONS[compareCat2] ?? "💳"} ${compareCat2} أعلى بـ ${(cat2Total6 - cat1Total6).toFixed(0)} ر.س خلال 6 أشهر`
+                              : "الإنفاق متساوٍ في التصنيفين ✓"
+                            }
+                          </div>
                         )}
                       </div>
                     </>
+
                   ) : (
-                    <p className="text-center text-sm text-gray-400 py-4">
-                      لا توجد بيانات لـ &quot;{analysisCat}&quot; في الأشهر الستة الماضية
-                    </p>
+                    /* ══ وضع التحليل المفرد ══ */
+                    catPeak.total > 0 ? (
+                      <>
+                        <div className="flex items-end justify-between gap-1.5 h-28">
+                          {catMonthlyData.map(({ year, month, label, total }) => {
+                            const heightPct = catMax > 0 ? (total / catMax) * 100 : 0;
+                            const isPeak    = total === catPeak.total && total > 0;
+                            const isLowest  = total === catLowest.total && total > 0 && total !== catPeak.total;
+                            return (
+                              <div key={`${year}-${month}`} className="flex flex-1 flex-col items-center gap-1">
+                                <span className={`text-[9px] font-bold ${isPeak ? "text-orange-500" : isLowest ? "text-[#1D9E75]" : "text-transparent"}`}>
+                                  {isPeak ? "🔺أعلى" : isLowest ? "✓أدنى" : "-"}
+                                </span>
+                                <span className={`text-[10px] font-bold ${isPeak ? "text-orange-500" : "text-gray-400"}`}>
+                                  {total > 0 ? total.toFixed(0) : ""}
+                                </span>
+                                <div className="w-full flex items-end justify-center" style={{ height: "68px" }}>
+                                  <div
+                                    className={`w-full rounded-t-lg transition-all ${
+                                      isPeak ? "bg-orange-400" : isLowest ? "bg-[#1D9E75]" : "bg-[#1D9E75]/30"
+                                    }`}
+                                    style={{ height: `${Math.max(heightPct, total > 0 ? 6 : 0)}%` }}
+                                  />
+                                </div>
+                                <span className="text-[10px] text-gray-400">{label.slice(0, 3)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="rounded-2xl bg-[#1D9E75]/6 border border-[#1D9E75]/15 p-4 space-y-2">
+                          <p className="text-xs font-extrabold text-[#1D9E75]">
+                            {CATEGORY_ICONS[analysisCat] ?? "💳"} {analysisCat} — ملخص 6 أشهر
+                          </p>
+                          <div className="grid grid-cols-3 gap-2 text-center">
+                            <div className="rounded-xl bg-orange-50 p-2">
+                              <p className="text-xs font-extrabold text-orange-500">{catPeak.total.toFixed(0)}</p>
+                              <p className="text-[10px] text-gray-400">أعلى شهر</p>
+                              <p className="text-[10px] font-bold text-orange-400">{catPeak.label}</p>
+                            </div>
+                            <div className="rounded-xl bg-[#1D9E75]/8 p-2">
+                              <p className="text-xs font-extrabold text-[#1D9E75]">{catAvg.toFixed(0)}</p>
+                              <p className="text-[10px] text-gray-400">المتوسط</p>
+                              <p className="text-[10px] font-bold text-[#1D9E75]">ر.س/شهر</p>
+                            </div>
+                            <div className="rounded-xl bg-blue-50 p-2">
+                              <p className="text-xs font-extrabold text-blue-500">{catLowest.total.toFixed(0)}</p>
+                              <p className="text-[10px] text-gray-400">أدنى شهر</p>
+                              <p className="text-[10px] font-bold text-blue-400">{catLowest.label}</p>
+                            </div>
+                          </div>
+                          {catPeak.total > catAvg * 1.3 && (
+                            <p className="text-[11px] text-gray-500">
+                              ⚠️ شهر <strong className="text-orange-500">{catPeak.label}</strong> أعلى من المتوسط بنسبة{" "}
+                              <strong className="text-orange-500">
+                                {(((catPeak.total - catAvg) / catAvg) * 100).toFixed(0)}%
+                              </strong>
+                            </p>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-center text-sm text-gray-400 py-4">
+                        لا توجد بيانات لـ &quot;{analysisCat}&quot; في الأشهر الستة الماضية
+                      </p>
+                    )
                   )}
                 </div>
               )}
