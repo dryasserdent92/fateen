@@ -664,19 +664,26 @@ export default function ExpensesPage() {
                 return slice;
               });
               return (
-                <div className="mt-4 rounded-2xl bg-white/10 p-3">
+                <div className="mt-4 rounded-2xl bg-white shadow p-3">
                   {filterCategory && (
-                    <p className="text-[10px] text-white/60 text-center mb-2">
-                      فلتر: <strong className="text-white">{filterCategory}</strong>
-                      {" · "}
-                      <button type="button" onClick={() => setFilterCategory(null)} className="underline">إلغاء</button>
-                    </p>
+                    <div className="flex items-center justify-between mb-2 px-1">
+                      <span className="text-[11px] text-gray-500">
+                        فلتر: <strong className="text-[#1D9E75]">{filterCategory}</strong>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setFilterCategory(null)}
+                        className="text-[11px] font-bold text-gray-400 hover:text-gray-600"
+                      >
+                        ✕ إلغاء
+                      </button>
+                    </div>
                   )}
-                  <div className="flex items-center gap-3">
-                    {/* دائرة SVG */}
+                  <div className="flex items-center gap-3" dir="ltr">
+                    {/* دائرة SVG — دائماً على اليسار */}
                     <div className="shrink-0">
                       <svg width="160" height="160" viewBox="0 0 160 160">
-                        <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="20"/>
+                        <circle cx={CX} cy={CY} r={R} fill="none" stroke="#f3f4f6" strokeWidth="20"/>
                         {slices.map((s) => (
                           <circle
                             key={s.cat}
@@ -687,19 +694,19 @@ export default function ExpensesPage() {
                             strokeDasharray={`${s.dash - 1.5} ${circumference - s.dash + 1.5}`}
                             strokeDashoffset={-s.offset + circumference * 0.25}
                             strokeLinecap="butt"
-                            style={{ opacity: filterCategory && filterCategory !== s.cat ? 0.3 : 1, transition: "opacity .2s" }}
+                            style={{ opacity: filterCategory && filterCategory !== s.cat ? 0.2 : 1, transition: "opacity .2s" }}
                           />
                         ))}
-                        <text x={CX} y={CY - 5} textAnchor="middle" fontSize="14" fontWeight="900" fill="white" fontFamily="Tajawal">
+                        <text x={CX} y={CY - 5} textAnchor="middle" fontSize="14" fontWeight="900" fill="#0f172a" fontFamily="Tajawal">
                           {currentMonthTotal.toFixed(0)}
                         </text>
-                        <text x={CX} y={CY + 12} textAnchor="middle" fontSize="8.5" fill="rgba(255,255,255,0.6)" fontFamily="Tajawal">
+                        <text x={CX} y={CY + 12} textAnchor="middle" fontSize="8.5" fill="#94a3b8" fontFamily="Tajawal">
                           ر.س
                         </text>
                       </svg>
                     </div>
-                    {/* legend مضغوط */}
-                    <div className="flex-1 min-w-0 space-y-1">
+                    {/* legend — على اليمين بنص عربي */}
+                    <div className="flex-1 min-w-0 space-y-1" dir="rtl">
                       {slices.map((s) => {
                         const isActive = filterCategory === s.cat;
                         return (
@@ -711,18 +718,21 @@ export default function ExpensesPage() {
                               setSelectMode(false);
                               setSelected(new Set());
                             }}
-                            className={`w-full flex items-center gap-2 rounded-xl px-2 py-1.5 transition-all text-right ${
-                              isActive ? "bg-white/20 ring-1 ring-white/40" : "hover:bg-white/10"
+                            className={`w-full flex items-center gap-2 rounded-xl px-2 py-1.5 text-right transition-all ${
+                              isActive
+                                ? "ring-2 ring-offset-0"
+                                : "hover:bg-gray-50"
                             }`}
+                            style={isActive ? { background: s.color + "18" } : {}}
                           >
-                            <span className="shrink-0 w-2 h-2 rounded-full" style={{ background: s.color }}/>
-                            <span className="flex-1 min-w-0 text-xs font-semibold text-white truncate">
-                              {allCategoryIcons[s.cat] ?? ""} {s.cat}
+                            <span className="shrink-0 w-2.5 h-2.5 rounded-full" style={{ background: s.color }}/>
+                            <span className="flex-1 min-w-0 text-xs font-semibold text-gray-700 truncate">
+                              {allCategoryIcons[s.cat] ?? "💳"} {s.cat}
                             </span>
-                            <span className="shrink-0 text-xs font-extrabold text-white">
+                            <span className="shrink-0 text-xs font-extrabold text-gray-800">
                               {s.total.toFixed(0)}
                             </span>
-                            <span className="shrink-0 text-[10px] text-white/50 w-6 text-left">
+                            <span className="shrink-0 text-[10px] text-gray-400 w-7">
                               {s.pct > 0 ? `${(s.pct * 100).toFixed(0)}%` : ""}
                             </span>
                           </button>
