@@ -103,6 +103,11 @@ export default function ExpensesPage() {
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<number | string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+
+  /* نقل التصنيف */
+  const [showMovePicker, setShowMovePicker] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const [moveSuccess, setMoveSuccess] = useState<string | null>(null);
   const [userSettings, setUserSettings] = useState<UserSettings>({ startDay: 1, budget: 0, customCategories: [] });
 
   /* فلتر الشهر — يبدأ بالشهر الحالي */
@@ -211,6 +216,35 @@ export default function ExpensesPage() {
       alert("حدث خطأ أثناء الحذف، حاول مجدداً");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleMoveSelected(targetCat: string) {
+    if (selected.size === 0) return;
+    setMoving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("غير مصرح");
+      const ids = Array.from(selected);
+      const { error } = await supabase
+        .from("expenses")
+        .update({ category: targetCat })
+        .in("id", ids)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      setExpenses((prev) =>
+        prev.map((e) => selected.has(e.id) ? { ...e, category: targetCat } : e)
+      );
+      const count = selected.size;
+      setSelected(new Set());
+      setSelectMode(false);
+      setShowMovePicker(false);
+      setMoveSuccess(`✓ تم نقل ${count} مصروف إلى "${targetCat}"`);
+      setTimeout(() => setMoveSuccess(null), 3000);
+    } catch {
+      alert("حدث خطأ أثناء النقل، حاول مجدداً");
+    } finally {
+      setMoving(false);
     }
   }
 
@@ -737,14 +771,24 @@ export default function ExpensesPage() {
                   {selected.size > 0 ? `${selected.size} محدد` : "اختر مصاريف"}
                 </p>
 
+                {/* زر نقل المحدد */}
+                <button
+                  type="button"
+                  onClick={() => setShowMovePicker(true)}
+                  disabled={selected.size === 0 || moving}
+                  className="rounded-xl bg-[#1D9E75] px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+                >
+                  نقل ↗
+                </button>
+
                 {/* زر حذف المحدد */}
                 <button
                   type="button"
                   onClick={() => void handleDeleteSelected()}
                   disabled={selected.size === 0 || deleting}
-                  className="rounded-xl bg-red-500 px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+                  className="rounded-xl bg-red-500 px-3 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
                 >
-                  {deleting ? "..." : `حذف (${selected.size})`}
+                  {deleting ? "..." : "🗑️"}
                 </button>
 
                 {/* إلغاء */}
@@ -1041,6 +1085,53 @@ export default function ExpensesPage() {
         </div>
       </main>
       <BottomNav />
+
+      {/* ── Toast نجاح النقل ── */}
+      {moveSuccess && (
+        <div className="fixed bottom-24 inset-x-0 z-50 flex justify-center px-4 pointer-events-none">
+          <div className="bg-[#1D9E75] text-white text-sm font-bold px-5 py-3 rounded-2xl shadow-lg">
+            {moveSuccess}
+          </div>
+        </div>
+      )}
+
+      {/* ── Bottom Sheet: اختيار التصنيف للنقل ── */}
+      {showMovePicker && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setShowMovePicker(false)}
+          />
+          <div className="relative w-full max-w-xl bg-white rounded-t-3xl p-6 pb-10 shadow-2xl">
+            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
+            <p className="text-base font-extrabold text-gray-800 mb-1">
+              نقل {selected.size} مصروف إلى تصنيف
+            </p>
+            <p className="text-xs text-gray-400 mb-5">اختر التصنيف الجديد</p>
+            <div className="grid grid-cols-3 gap-2 max-h-72 overflow-y-auto">
+              {Object.entries(allCategoryIcons).map(([cat, icon]) => (
+                <button
+                  key={cat}
+                  type="button"
+                  disabled={moving}
+                  onClick={() => void handleMoveSelected(cat)}
+                  className="flex flex-col items-center gap-1.5 rounded-2xl border-2 border-gray-100 bg-gray-50 p-3 transition-all hover:border-[#1D9E75] hover:bg-[#1D9E75]/5 active:scale-95 disabled:opacity-50"
+                >
+                  <span className="text-2xl">{icon}</span>
+                  <span className="text-xs font-semibold text-gray-700 text-center leading-tight">{cat}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowMovePicker(false)}
+              className="mt-4 w-full rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-600"
+            >
+              إلغاء
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal التعديل ── */}
       {editingExpense && (
