@@ -48,6 +48,7 @@ export default function Home() {
   const [loading, setLoading]             = useState(true);
   const [deletingId, setDeletingId]       = useState<number | string | null>(null);
   const [userBudget, setUserBudget]       = useState<number>(0);
+  const [expiringWarranties, setExpiringWarranties] = useState<{ id: number; product_name: string; warranty_end_date: string }[]>([]);
 
   useEffect(() => {
     // نحمّل الإعدادات من localStorage بعد ما يفتح المتصفح
@@ -135,6 +136,20 @@ export default function Home() {
       .gte("date", periodStart);
     const total = (monthData ?? []).reduce((s, e) => s + toNumber(e.amount), 0);
     setMonthTotal(total);
+
+    /* ضمانات تنتهي خلال 30 يوم */
+    const todaySA = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+    const in30 = new Date(todaySA + "T00:00:00");
+    in30.setDate(in30.getDate() + 30);
+    const in30Str = in30.toISOString().split("T")[0]!;
+    const { data: expiringData } = await supabase
+      .from("warranties")
+      .select("id,product_name,warranty_end_date")
+      .eq("user_id", userId)
+      .gte("warranty_end_date", todaySA)
+      .lte("warranty_end_date", in30Str)
+      .order("warranty_end_date", { ascending: true });
+    setExpiringWarranties(expiringData ?? []);
 
     setLoading(false);
   }
@@ -249,6 +264,24 @@ export default function Home() {
               التقارير
             </Link>
           </div>
+
+          {/* تنبيه الضمانات */}
+          {!loading && expiringWarranties.length > 0 && (
+            <Link href="/warranties" className="block rounded-2xl bg-red-50 border border-red-200 px-4 py-3 shadow-sm active:scale-[0.98] transition-transform">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🛡️</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-red-700">
+                    {expiringWarranties.length === 1
+                      ? `ضمان "${expiringWarranties[0]!.product_name}" ينتهي قريباً`
+                      : `${expiringWarranties.length} ضمانات تنتهي خلال 30 يوم`}
+                  </p>
+                  <p className="text-xs text-red-400 mt-0.5">اضغط لعرض التفاصيل</p>
+                </div>
+                <span className="text-red-300 text-lg">←</span>
+              </div>
+            </Link>
+          )}
 
           {/* آخر المصاريف */}
           {!loading && recentExpenses.length > 0 && (

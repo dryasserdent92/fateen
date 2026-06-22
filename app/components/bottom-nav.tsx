@@ -4,12 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { href: "/",         icon: "🏠", label: "الرئيسية" },
-  { href: "/expenses", icon: "🧾", label: "المصاريف" },
-  { href: "/add",      icon: null,  label: "إضافة"    }, /* زر الإضافة المركزي */
-  { href: "/smart",    icon: "💰", label: "وفّرلي"    },
-  { href: "/reports",  icon: "📊", label: "التقارير"  },
-  { href: "/settings", icon: "⚙️", label: "الإعدادات" },
+  { href: "/",            icon: "🏠", label: "الرئيسية" },
+  { href: "/expenses",    icon: "🧾", label: "المصاريف" },
+  { href: "/add",         icon: null,  label: "إضافة"    }, /* زر الإضافة المركزي */
+  { href: "/warranties",  icon: "🛡️", label: "ضماناتي"  },
+  { href: "/reports",     icon: "📊", label: "التقارير"  },
+  { href: "/settings",    icon: "⚙️", label: "الإعدادات" },
 ] as const;
 
 export default function BottomNav() {
