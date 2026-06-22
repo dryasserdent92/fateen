@@ -144,6 +144,17 @@ function fixDate(raw: string): string {
   return s;
 }
 
+/**
+ * يبحث في نص SMS عن التواريخ الغامضة (XX-XX-XX) ويحوّلها لـ YYYY-MM-DD
+ * قبل إرسال النص لـ Claude — يمنع Claude من تفسير السنة بشكل خاطئ
+ */
+function preFixDatesInText(text: string): string {
+  return text.replace(/\b(\d{2,4})[.\-/](\d{1,2})[.\-/](\d{1,4})\b/g, (match) => {
+    const fixed = fixDate(match);
+    return fixed !== match ? fixed : match;
+  });
+}
+
 function normalizeExpense(parsed: ParsedExpense) {
   const today = new Date().toISOString().split("T")[0]!;
   const rawDate = typeof parsed.date === "string" && parsed.date.trim() ? parsed.date.trim() : today;
@@ -239,10 +250,13 @@ export async function POST(req: NextRequest) {
   try {
     /* تحليل نص SMS أو صوت */
     if (hasSmsText) {
+      // نصحح التواريخ الغامضة في النص قبل إرساله لـ Claude
+      // مثال: "26-06-23" → "2026-06-23" حتى لا يخطئ Claude في تفسيرها
+      const fixedSmsText = preFixDatesInText(smsText!.trim());
       const textExpense = await callClaude(apiKey, [
         {
           type: "text",
-          text: `${buildPrompt("النص التالي")}\n\nالنص: ${smsText!.trim()}`,
+          text: `${buildPrompt("النص التالي")}\n\nالنص: ${fixedSmsText}`,
         },
       ]);
       expenses.push(textExpense);
