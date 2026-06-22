@@ -89,6 +89,7 @@ export default function WarrantiesPage() {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [showExpired, setShowExpired] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -121,8 +122,9 @@ export default function WarrantiesPage() {
   async function handleSave() {
     if (!form.product_name.trim()) return;
     setSaving(true);
+    setSaveError(null);
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setSaving(false); return; }
+    if (!user) { setSaving(false); setSaveError("يرجى تسجيل الدخول أولاً"); return; }
 
     const warranty_end_date = addMonths(form.purchase_date, form.warranty_months);
     const { error } = await supabase.from("warranties").insert({
@@ -136,8 +138,16 @@ export default function WarrantiesPage() {
     });
 
     setSaving(false);
-    if (!error) {
+    if (error) {
+      // عرض الخطأ الكامل لمساعدة التشخيص
+      if (error.message?.includes("does not exist") || error.code === "42P01") {
+        setSaveError("جدول الضمانات غير موجود — يرجى تشغيل SQL في Supabase أولاً (راجع التعليمات أسفله)");
+      } else {
+        setSaveError(`خطأ: ${error.message ?? error.code}`);
+      }
+    } else {
       setShowAdd(false);
+      setSaveError(null);
       setForm({ product_name: "", purchase_date: today, warranty_months: 12, store: "", notes: "" });
       setSuccessMsg("✓ تمت إضافة الضمان");
       setTimeout(() => setSuccessMsg(null), 3000);
@@ -371,6 +381,12 @@ export default function WarrantiesPage() {
                   className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800 outline-none focus:border-[#1D9E75] focus:ring-1 focus:ring-[#1D9E75]"
                 />
               </div>
+
+              {saveError && (
+                <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 font-medium">
+                  {saveError}
+                </div>
+              )}
 
               <button
                 onClick={() => void handleSave()}
