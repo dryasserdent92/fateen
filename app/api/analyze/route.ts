@@ -97,15 +97,32 @@ function fixDate(raw: string): string {
   if (!raw) return raw;
   const s = raw.trim();
 
-  // صيغة YYYY-MM-DD أو YY-MM-DD (مع شرطات)
+  // صيغة YYYY-MM-DD أو YY-MM-DD أو DD-MM-YY (مع شرطات)
   const isoLike = s.match(/^(\d{2,4})[.\-/](\d{1,2})[.\-/](\d{1,2})$/);
   if (isoLike) {
     const [, p1, p2, p3] = isoLike as [string, string, string, string];
     let y = parseInt(p1), m = parseInt(p2), d = parseInt(p3);
-    // إذا كان p1 <= 31 وp3 >= 2000 → الصيغة DD-MM-YYYY
+
+    // حالة DD-MM-YYYY: p1 <= 31 وp3 >= 2000
     if (y <= 31 && d >= 2000) { [y, d] = [d, y]; }
-    // سنة بـ رقمين
+    // حالة YY-MM-DD أو DD-MM-YY: كلاهما رقمان ≤2 خانات
+    // نحدد السنة بالأقرب للسنة الحالية:
+    // مثال: 20-06-26 → p3=26 أقرب لـ26 → سنة=26، يوم=20
+    // مثال: 26-06-23 → p1=26 أقرب لـ26 → سنة=26، يوم=23
+    else if (p1.length <= 2 && p3.length <= 2) {
+      const curr2 = new Date().getFullYear() % 100;
+      const p1Diff = Math.abs(y - curr2);
+      const p3Diff = Math.abs(d - curr2);
+      if (p3Diff < p1Diff) {
+        // p3 هو السنة، p1 هو اليوم
+        [y, d] = [d, y];
+      }
+      // else: p1 هو السنة، p3 هو اليوم (الوضع الافتراضي)
+    }
+
+    // سنة بـ رقمين → +2000
     if (y < 100) y += 2000;
+
     // تحقق من المنطقية
     if (y >= 2020 && y <= 2099 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
       return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
