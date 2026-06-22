@@ -248,21 +248,39 @@ export default function Home() {
           </div>
 
           {/* أزرار سريعة */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3">
+            {/* زر إضافة مصروف — كامل العرض */}
             <Link
               href="/add"
-              className="flex items-center justify-center gap-2 rounded-3xl bg-white py-4 text-base font-bold text-[#1D9E75] shadow-lg transition-opacity hover:opacity-90 active:scale-[0.98]"
+              className="flex items-center justify-center gap-2 rounded-3xl bg-white py-4 text-base font-bold text-[#1D9E75] shadow-lg transition-opacity hover:opacity-90 active:scale-[0.98] w-full"
             >
               <span className="text-xl">📸</span>
               أضف مصروف
             </Link>
-            <Link
-              href="/reports"
-              className="flex items-center justify-center gap-2 rounded-3xl bg-white/20 py-4 text-base font-bold text-white shadow-lg transition-opacity hover:opacity-90 active:scale-[0.98]"
-            >
-              <span className="text-xl">📊</span>
-              التقارير
-            </Link>
+            {/* ثلاثة أزرار صف واحد */}
+            <div className="grid grid-cols-3 gap-3">
+              <Link
+                href="/smart"
+                className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-white/20 py-3.5 text-white shadow transition-opacity hover:opacity-90 active:scale-[0.98]"
+              >
+                <span className="text-2xl">💰</span>
+                <span className="text-xs font-bold">وفّرلي</span>
+              </Link>
+              <Link
+                href="/warranties"
+                className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-white/20 py-3.5 text-white shadow transition-opacity hover:opacity-90 active:scale-[0.98]"
+              >
+                <span className="text-2xl">🛡️</span>
+                <span className="text-xs font-bold">ضماناتي</span>
+              </Link>
+              <Link
+                href="/reports"
+                className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-white/20 py-3.5 text-white shadow transition-opacity hover:opacity-90 active:scale-[0.98]"
+              >
+                <span className="text-2xl">📊</span>
+                <span className="text-xs font-bold">التقارير</span>
+              </Link>
+            </div>
           </div>
 
           {/* تنبيه الضمانات */}
