@@ -295,7 +295,9 @@ export default function WarrantiesPage() {
         {/* Modal إضافة ضمان */}
         {showAdd && (
           <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-0" onClick={(e) => { if (e.target === e.currentTarget) setShowAdd(false); }}>
-            <div className="w-full max-w-xl rounded-t-3xl bg-white p-6 pb-10 shadow-2xl space-y-4">
+            <div className="w-full max-w-xl rounded-t-3xl bg-white shadow-2xl flex flex-col" style={{ maxHeight: "92vh" }}>
+              {/* محتوى قابل للتمرير */}
+              <div className="overflow-y-auto flex-1 p-6 space-y-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)" }}>
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-extrabold text-gray-800">إضافة ضمان جديد</h2>
                 <button onClick={() => setShowAdd(false)} className="text-gray-400 text-xl leading-none">✕</button>
@@ -395,6 +397,7 @@ export default function WarrantiesPage() {
               >
                 {saving ? "جاري الحفظ..." : "حفظ الضمان 🛡️"}
               </button>
+              </div>{/* نهاية المحتوى القابل للتمرير */}
             </div>
           </div>
         )}
