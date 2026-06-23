@@ -297,7 +297,7 @@ export default function WarrantiesPage() {
           <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-0" onClick={(e) => { if (e.target === e.currentTarget) setShowAdd(false); }}>
             <div className="w-full max-w-xl rounded-t-3xl bg-white shadow-2xl flex flex-col" style={{ maxHeight: "92vh" }}>
               {/* محتوى قابل للتمرير */}
-              <div className="overflow-y-auto flex-1 p-6 space-y-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)" }}>
+              <div className="overflow-y-auto flex-1 p-6 space-y-4 pb-2">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-extrabold text-gray-800">إضافة ضمان جديد</h2>
                 <button onClick={() => setShowAdd(false)} className="text-gray-400 text-xl leading-none">✕</button>
@@ -384,20 +384,23 @@ export default function WarrantiesPage() {
                 />
               </div>
 
-              {saveError && (
-                <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 font-medium">
-                  {saveError}
-                </div>
-              )}
-
-              <button
-                onClick={() => void handleSave()}
-                disabled={saving || !form.product_name.trim()}
-                className="w-full rounded-2xl bg-[#1D9E75] py-4 text-base font-extrabold text-white shadow-lg transition-opacity disabled:opacity-50 active:scale-[0.98]"
-              >
-                {saving ? "جاري الحفظ..." : "حفظ الضمان 🛡️"}
-              </button>
               </div>{/* نهاية المحتوى القابل للتمرير */}
+
+              {/* زر الحفظ مثبّت في الأسفل دائماً */}
+              <div className="flex-shrink-0 px-6 pt-3 pb-6 border-t border-gray-100 bg-white space-y-3">
+                {saveError && (
+                  <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 font-medium">
+                    {saveError}
+                  </div>
+                )}
+                <button
+                  onClick={() => void handleSave()}
+                  disabled={saving || !form.product_name.trim()}
+                  className="w-full rounded-2xl bg-[#1D9E75] py-4 text-base font-extrabold text-white shadow-lg transition-opacity disabled:opacity-50 active:scale-[0.98]"
+                >
+                  {saving ? "جاري الحفظ..." : "حفظ الضمان 🛡️"}
+                </button>
+              </div>
             </div>
           </div>
         )}
