@@ -294,7 +294,7 @@ export default function WarrantiesPage() {
 
         {/* Modal إضافة ضمان */}
         {showAdd && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-0" onClick={(e) => { if (e.target === e.currentTarget) setShowAdd(false); }}>
+          <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 px-0" onClick={(e) => { if (e.target === e.currentTarget) setShowAdd(false); }}>
             <div className="w-full max-w-xl rounded-t-3xl bg-white shadow-2xl flex flex-col" style={{ maxHeight: "92vh" }}>
               {/* محتوى قابل للتمرير */}
               <div className="overflow-y-auto flex-1 p-6 space-y-4 pb-2">
