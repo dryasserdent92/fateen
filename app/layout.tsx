@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Noto_Sans_Arabic } from "next/font/google";
 import "./globals.css";
+import ShareListener from "./components/share-listener";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -28,7 +29,10 @@ export default function RootLayout({
       dir="rtl"
       className={`${notoSansArabic.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <ShareListener />
+        {children}
+      </body>
     </html>
   );
 }

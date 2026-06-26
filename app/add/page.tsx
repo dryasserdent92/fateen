@@ -118,6 +118,20 @@ export default function AddExpensePage() {
     setAllCategories([...DEFAULT_CATEGORIES, ...customNames]);
   }, []);
 
+  /* ── Share Extension: قراءة الرسالة المشارَكة من iOS ── */
+  useEffect(() => {
+    const shared = sessionStorage.getItem("fateenPendingShare");
+    if (shared) {
+      sessionStorage.removeItem("fateenPendingShare");
+      setMethod("sms");
+      setSmsText(shared);
+      // تحليل تلقائي بعد 400ms لإعطاء الـ UI وقت للتحديث
+      setTimeout(() => {
+        document.getElementById("analyze-btn")?.click();
+      }, 400);
+    }
+  }, []);
+
   /* cleanup on unmount */
   useEffect(() => () => {
     recognitionRef.current?.stop();
@@ -461,6 +475,7 @@ export default function AddExpensePage() {
                 </div>
               ) : (
                 <button
+                  id="analyze-btn"
                   type="button"
                   onClick={() => void handleAnalyze()}
                   disabled={recording}
