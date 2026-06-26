@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 
 class ShareViewController: UIViewController {
 
-    private let appGroupId  = "group.com.fateen.app"
+    private let appGroupId  = "group.com.yasseralmunajem.fateen"
     private let pendingKey  = "pendingShareText"
     private let green       = UIColor(red: 0.114, green: 0.620, blue: 0.459, alpha: 1)
 

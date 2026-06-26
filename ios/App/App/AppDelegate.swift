@@ -7,7 +7,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
 
-    private let appGroupId = "group.com.fateen.app"
+    private let appGroupId = "group.com.yasseralmunajem.fateen"
     private let pendingKey = "pendingShareText"
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
