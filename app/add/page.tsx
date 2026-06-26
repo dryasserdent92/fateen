@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import AuthGuard from "../components/auth-guard";
 import { supabase } from "../../lib/supabase";
 import { apiUrl } from "../../lib/api-client";
@@ -78,6 +79,16 @@ const ANALYZING_MESSAGES = [
 ];
 
 export default function AddExpensePage() {
+  return (
+    <Suspense fallback={null}>
+      <AddExpenseInner />
+    </Suspense>
+  );
+}
+
+function AddExpenseInner() {
+  const searchParams = useSearchParams();
+
   const [step, setStep]             = useState<Step>("input");
   const [method, setMethod]         = useState<InputMethod>("image");
 
@@ -118,18 +129,32 @@ export default function AddExpensePage() {
     setAllCategories([...DEFAULT_CATEGORIES, ...customNames]);
   }, []);
 
-  /* ── Share Extension: قراءة الرسالة المشارَكة من iOS ── */
+  /* ── قراءة SMS من URL (?sms=...) أو من Share Extension (sessionStorage) ── */
   useEffect(() => {
+    // 1) من iOS Shortcuts عبر رابط URL
+    const smsParam = searchParams.get("sms");
+    if (smsParam) {
+      const decoded = decodeURIComponent(smsParam);
+      setMethod("sms");
+      setSmsText(decoded);
+      // تحليل تلقائي بعد 500ms
+      setTimeout(() => {
+        document.getElementById("analyze-btn")?.click();
+      }, 500);
+      return; // لا تتحقق من sessionStorage إذا كان URL يحتوي قيمة
+    }
+
+    // 2) من Share Extension عبر sessionStorage
     const shared = sessionStorage.getItem("fateenPendingShare");
     if (shared) {
       sessionStorage.removeItem("fateenPendingShare");
       setMethod("sms");
       setSmsText(shared);
-      // تحليل تلقائي بعد 400ms لإعطاء الـ UI وقت للتحديث
       setTimeout(() => {
         document.getElementById("analyze-btn")?.click();
       }, 400);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* cleanup on unmount */
@@ -761,4 +786,4 @@ export default function AddExpensePage() {
       </main>
     </AuthGuard>
   );
-}
+} /* end AddExpenseInner */
