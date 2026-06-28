@@ -6,7 +6,7 @@ import { supabase } from "../../lib/supabase";
 import { apiUrl } from "../../lib/api-client";
 import AuthGuard from "../components/auth-guard";
 import BottomNav from "../components/bottom-nav";
-import { loadSettings, getPeriodStart, type UserSettings } from "../../lib/user-settings";
+import { loadSettings, getCycleKey, getCycleRange, type UserSettings } from "../../lib/user-settings";
 
 type ExpenseItem = {
   name: string;
@@ -110,10 +110,12 @@ export default function ExpensesPage() {
   const [moveSuccess, setMoveSuccess] = useState<string | null>(null);
   const [userSettings, setUserSettings] = useState<UserSettings>({ startDay: 1, budget: 0, customCategories: [] });
 
-  /* فلتر الشهر — يبدأ بالشهر الحالي */
-  const [selectedMonthKey, setSelectedMonthKey] = useState<string>(() =>
-    new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }).slice(0, 7)
-  );
+  /* فلتر الشهر — يبدأ بالدورة الحالية */
+  const [selectedMonthKey, setSelectedMonthKey] = useState<string>(() => {
+    const todaySA = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+    const { startDay } = loadSettings();
+    return getCycleKey(todaySA, startDay);
+  });
 
   /* التعديل */
   type EditItem = { name: string; brand: string; quantity: number; unit_price: number; total_price: number };
@@ -350,23 +352,35 @@ export default function ExpensesPage() {
 
   /* تاريخ اليوم بتوقيت السعودية */
   const todaySAStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
-  const currentMonthKey = todaySAStr.slice(0, 7);
+
+  /* مفتاح الدورة الحالية (يعتمد على startDay من الإعدادات) */
+  const currentMonthKey = getCycleKey(todaySAStr, userSettings.startDay);
 
   const MONTH_NAMES = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
 
   function getMonthKey(dateStr: string | null): string {
     if (!dateStr) return "غير محدد";
-    return dateStr.slice(0, 7);
+    return getCycleKey(dateStr, userSettings.startDay);
   }
 
   function monthKeyLabel(key: string): string {
     if (key === "غير محدد") return "غير محدد";
     const [y, m] = key.split("-");
     const monthIdx = parseInt(m ?? "1") - 1;
-    return `${MONTH_NAMES[monthIdx] ?? m} ${y}`;
+    const monthName = `${MONTH_NAMES[monthIdx] ?? m} ${y}`;
+    /* إذا كان startDay != 1 أضف نطاق الدورة تحت الاسم */
+    if (userSettings.startDay > 1) {
+      const { start, end } = getCycleRange(key, userSettings.startDay);
+      const fmt = (d: string) => {
+        const dt = new Date(`${d}T12:00:00+03:00`);
+        return dt.toLocaleDateString("ar-EG-u-nu-latn", { month: "short", day: "numeric", timeZone: "Asia/Riyadh", calendar: "gregory" });
+      };
+      return `${monthName} (${fmt(start)} – ${fmt(end)})`;
+    }
+    return monthName;
   }
 
-  /* كل الأشهر المتوفرة في البيانات — مرتبة من الأحدث */
+  /* كل الدورات المتوفرة في البيانات — مرتبة من الأحدث */
   const allMonthKeys: string[] = [
     ...new Set(expenses.map(e => getMonthKey(e.date)).filter(k => k !== "غير محدد"))
   ];
@@ -377,7 +391,7 @@ export default function ExpensesPage() {
     ? allMonthKeys.indexOf(selectedMonthKey)
     : 0;
 
-  /* مصاريف الشهر المختار */
+  /* مصاريف الدورة المختارة */
   const selectedMonthExpenses = expenses.filter(e => getMonthKey(e.date) === selectedMonthKey);
 
   /* البحث — يعمل على كل المصاريف بغض النظر عن الشهر */
@@ -417,11 +431,8 @@ export default function ExpensesPage() {
   (userSettings.customCategories ?? []).forEach(c => { allCategoryIcons[c.name] = c.icon; });
 
 
-  /* الميزانية — تظهر فقط للشهر الحالي */
-  const periodStart = getPeriodStart(todaySAStr, userSettings.startDay);
-  const periodTotal = selectedMonthKey === currentMonthKey
-    ? expenses.reduce((s, e) => (!e.date ? s : e.date >= periodStart ? s + toNumber(e.amount) : s), 0)
-    : null;
+  /* الميزانية — تظهر فقط للدورة الحالية */
+  const periodTotal = selectedMonthKey === currentMonthKey ? currentMonthTotal : null;
   const remaining = userSettings.budget > 0 && periodTotal !== null
     ? userSettings.budget - periodTotal
     : null;
@@ -544,11 +555,34 @@ export default function ExpensesPage() {
                   className="flex size-9 items-center justify-center rounded-xl text-[#1D9E75] font-bold disabled:opacity-25 hover:bg-[#1D9E75]/10 active:scale-95 transition-all"
                 >◀</button>
                 <div className="flex-1 text-center">
-                  <p className="text-sm font-extrabold text-[#1D9E75]">
-                    {monthKeyLabel(selectedMonthKey)}
-                  </p>
-                  {selectedMonthKey === currentMonthKey && (
-                    <p className="text-xs text-[#1D9E75]/50">الشهر الحالي</p>
+                  {userSettings.startDay > 1 ? (() => {
+                    /* عرض اسم الدورة + نطاقها */
+                    const [y, mo] = selectedMonthKey.split("-");
+                    const monthIdx = parseInt(mo ?? "1") - 1;
+                    const { start, end } = getCycleRange(selectedMonthKey, userSettings.startDay);
+                    const fmt = (d: string) => {
+                      const dt = new Date(`${d}T12:00:00+03:00`);
+                      return dt.toLocaleDateString("ar-EG-u-nu-latn", { month: "short", day: "numeric", timeZone: "Asia/Riyadh", calendar: "gregory" });
+                    };
+                    return (
+                      <>
+                        <p className="text-sm font-extrabold text-[#1D9E75]">
+                          {MONTH_NAMES[monthIdx]} {y}
+                        </p>
+                        <p className="text-xs text-[#1D9E75]/60">
+                          {fmt(start)} – {fmt(end)}
+                        </p>
+                      </>
+                    );
+                  })() : (
+                    <>
+                      <p className="text-sm font-extrabold text-[#1D9E75]">
+                        {monthKeyLabel(selectedMonthKey)}
+                      </p>
+                      {selectedMonthKey === currentMonthKey && (
+                        <p className="text-xs text-[#1D9E75]/50">الشهر الحالي</p>
+                      )}
+                    </>
                   )}
                 </div>
                 {/* الشهر التالي (أحدث) */}
@@ -579,10 +613,7 @@ export default function ExpensesPage() {
                 ) : (
                   <>
                     <p className="text-xs font-medium text-gray-500">
-                      {selectedMonthKey === currentMonthKey ? "إجمالي الفترة الحالية" : `إجمالي ${monthKeyLabel(selectedMonthKey)}`}
-                      {selectedMonthKey === currentMonthKey && userSettings.startDay !== 1 && (
-                        <span className="mr-1 text-gray-400">(منذ {userSettings.startDay} الشهر)</span>
-                      )}
+                      {selectedMonthKey === currentMonthKey ? "إجمالي الدورة الحالية" : `إجمالي دورة ${monthKeyLabel(selectedMonthKey)}`}
                     </p>
                     <p className="mt-1 text-4xl font-extrabold text-[#1D9E75]">
                       {currentMonthTotal.toFixed(2)}
