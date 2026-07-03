@@ -137,11 +137,13 @@ function AddExpenseInner() {
       const decoded = decodeURIComponent(smsParam);
       setMethod("sms");
       setSmsText(decoded);
+      // تأكيد مسبق تلقائي (المستخدم قادم من Shortcut ← الرسالة موثوقة)
+      setConfirmed(true);
       // تحليل تلقائي بعد 500ms
       setTimeout(() => {
         document.getElementById("analyze-btn")?.click();
       }, 500);
-      return; // لا تتحقق من sessionStorage إذا كان URL يحتوي قيمة
+      return;
     }
 
     // 2) من Share Extension عبر sessionStorage
@@ -150,6 +152,7 @@ function AddExpenseInner() {
       sessionStorage.removeItem("fateenPendingShare");
       setMethod("sms");
       setSmsText(shared);
+      setConfirmed(true);
       setTimeout(() => {
         document.getElementById("analyze-btn")?.click();
       }, 400);
