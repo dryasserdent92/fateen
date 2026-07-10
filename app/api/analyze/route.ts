@@ -13,6 +13,7 @@ type ParsedExpense = {
   store: string | null;
   amount: string | number | null;
   date: string | null;
+  time: string | null;
   category: string | null;
   item_name: string | null;
   item_brand: string | null;
@@ -26,7 +27,7 @@ function buildPrompt(inputLabel: string): string {
 السنة الحالية: ${currentYear} — إذا ظهرت سنة مكونة من رقمين مثل "26" فاعتبرها ${currentYear}.
 
 الشكل المطلوب:
-{"store":"اسم المتجر","amount":0,"date":"YYYY-MM-DD","category":"التصنيف","item_name":null,"item_brand":null,"items":[{"name":"اسم الصنف","brand":null,"quantity":1,"unit_price":0,"total_price":0}]}
+{"store":"اسم المتجر","amount":0,"date":"YYYY-MM-DD","time":"HH:MM","category":"التصنيف","item_name":null,"item_brand":null,"items":[{"name":"اسم الصنف","brand":null,"quantity":1,"unit_price":0,"total_price":0}]}
 
 تعليمات دقيقة:
 
@@ -64,6 +65,12 @@ function buildPrompt(inputLabel: string): string {
 - total_price: quantity × unit_price (احسبها أنت)
 - brand: الماركة إذا ذُكرت، وإلا null
 - للمشتريات أحادية الصنف (فنجان قهوة واحد، تعبئة بنزين) → items: null وضع التفاصيل في item_name/item_brand
+
+▌ time
+- وقت العملية بصيغة HH:MM (24 ساعة) — مثال: "14:32"
+- ص = AM، م = PM: اضف 12 للساعات 1–11 م (مثال: 2:30 م → "14:30"، 12:00 م → "12:00"، 12:00 ص → "00:00")
+- ابحث عن: الساعة / Time / وقت / at / الوقت
+- null إذا لم يُذكر وقت
 
 ▌ item_name / item_brand
 - للصنف الواحد فقط، null إذا items موجودة`;
@@ -155,6 +162,18 @@ function preFixDatesInText(text: string): string {
   });
 }
 
+/** تطبيع حقل الوقت → HH:MM أو null */
+function normalizeTime(raw: string | null | undefined): string | null {
+  if (!raw || typeof raw !== "string") return null;
+  const s = toWesternDigits(raw.trim());
+  // تطابق HH:MM أو H:MM مع ثواني اختيارية
+  const m = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (!m) return null;
+  const h = parseInt(m[1]!), min = parseInt(m[2]!);
+  if (h > 23 || min > 59) return null;
+  return `${String(h).padStart(2,"0")}:${String(min).padStart(2,"0")}`;
+}
+
 function normalizeExpense(parsed: ParsedExpense) {
   const today = new Date().toISOString().split("T")[0]!;
   const rawDate = typeof parsed.date === "string" && parsed.date.trim() ? parsed.date.trim() : today;
@@ -173,6 +192,7 @@ function normalizeExpense(parsed: ParsedExpense) {
     store:      parsed.store ?? null,
     amount,
     date:       validDate,
+    time:       normalizeTime(parsed.time),
     category:   parsed.category ?? "أخرى",
     item_name:  parsed.item_name ?? null,
     item_brand: parsed.item_brand ?? null,

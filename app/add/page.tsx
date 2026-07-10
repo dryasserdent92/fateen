@@ -34,6 +34,7 @@ type ExtractedExpense = {
   store: string;
   amount: string;
   date: string;
+  time: string;
   category: Category;
   item_name: string;
   item_brand: string;
@@ -117,7 +118,7 @@ function AddExpenseInner() {
   const [savedAmount, setSavedAmount] = useState<number | null>(null);
   const [confirmed, setConfirmed]   = useState(false); /* تأكيد الأصناف قبل الحفظ */
   const [expense, setExpense]       = useState<ExtractedExpense>({
-    store: "", amount: "", date: todaySA(), category: "أخرى",
+    store: "", amount: "", date: todaySA(), time: "", category: "أخرى",
     item_name: "", item_brand: "", items: null,
   });
 
@@ -255,6 +256,7 @@ function AddExpenseInner() {
           store:      String(raw["store"]      ?? ""),
           amount:     String(raw["amount"]     ?? ""),
           date:       String(raw["date"]       ?? todaySA()),
+          time:       raw["time"] ? String(raw["time"]) : "",
           category:   (raw["category"] as Category) ?? "أخرى",
           item_name:  String(raw["item_name"]  ?? ""),
           item_brand: String(raw["item_brand"] ?? ""),
@@ -300,6 +302,7 @@ function AddExpenseInner() {
           store:      expense.store || null,
           amount:     parseFloat(expense.amount),
           date:       expense.date,
+          time:       expense.time || null,
           category:   expense.category,
           item_name:  expense.item_name  || null,
           item_brand: expense.item_brand || null,
@@ -327,7 +330,7 @@ function AddExpenseInner() {
     setSavedAmount(null);
     setConfirmed(false);
     stopRecording();
-    setExpense({ store: "", amount: "", date: todaySA(), category: "أخرى", item_name: "", item_brand: "", items: null });
+    setExpense({ store: "", amount: "", date: todaySA(), time: "", category: "أخرى", item_name: "", item_brand: "", items: null });
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -555,12 +558,23 @@ function AddExpenseInner() {
                   )}
                 </div>
 
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">التاريخ</label>
-                  <input type="date" value={expense.date}
-                    onChange={(e) => setExpense((p) => ({ ...p, date: e.target.value }))}
-                    className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2"
-                  />
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">التاريخ</label>
+                    <input type="date" value={expense.date}
+                      onChange={(e) => setExpense((p) => ({ ...p, date: e.target.value }))}
+                      className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2"
+                    />
+                  </div>
+                  <div className="w-28">
+                    <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">
+                      الوقت {expense.time && <span className="text-[10px] font-normal text-[#1D9E75]/60">من الرسالة</span>}
+                    </label>
+                    <input type="time" value={expense.time}
+                      onChange={(e) => setExpense((p) => ({ ...p, time: e.target.value }))}
+                      className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2"
+                    />
+                  </div>
                 </div>
 
                 <div>
