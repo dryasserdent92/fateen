@@ -72,6 +72,11 @@ function todaySA(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
 }
 
+/* الوقت الحالي بتوقيت السعودية +3 */
+function currentTimeSA(): string {
+  return new Date().toLocaleTimeString("en-CA", { timeZone: "Asia/Riyadh", hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
 const ANALYZING_MESSAGES = [
   "🔍 فطين يقرأ فاتورتك...",
   "✨ يستخرج البيانات...",
@@ -118,7 +123,7 @@ function AddExpenseInner() {
   const [savedAmount, setSavedAmount] = useState<number | null>(null);
   const [confirmed, setConfirmed]   = useState(false); /* تأكيد الأصناف قبل الحفظ */
   const [expense, setExpense]       = useState<ExtractedExpense>({
-    store: "", amount: "", date: todaySA(), time: "", category: "أخرى",
+    store: "", amount: "", date: todaySA(), time: currentTimeSA(), category: "أخرى",
     item_name: "", item_brand: "", items: null,
   });
 
@@ -256,7 +261,7 @@ function AddExpenseInner() {
           store:      String(raw["store"]      ?? ""),
           amount:     String(raw["amount"]     ?? ""),
           date:       String(raw["date"]       ?? todaySA()),
-          time:       raw["time"] ? String(raw["time"]) : "",
+          time:       raw["time"] ? String(raw["time"]) : currentTimeSA(),
           category:   (raw["category"] as Category) ?? "أخرى",
           item_name:  String(raw["item_name"]  ?? ""),
           item_brand: String(raw["item_brand"] ?? ""),
@@ -330,7 +335,7 @@ function AddExpenseInner() {
     setSavedAmount(null);
     setConfirmed(false);
     stopRecording();
-    setExpense({ store: "", amount: "", date: todaySA(), time: "", category: "أخرى", item_name: "", item_brand: "", items: null });
+    setExpense({ store: "", amount: "", date: todaySA(), time: currentTimeSA(), category: "أخرى", item_name: "", item_brand: "", items: null });
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -558,23 +563,21 @@ function AddExpenseInner() {
                   )}
                 </div>
 
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">التاريخ</label>
-                    <input type="date" value={expense.date}
-                      onChange={(e) => setExpense((p) => ({ ...p, date: e.target.value }))}
-                      className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2"
-                    />
-                  </div>
-                  <div className="w-28">
-                    <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">
-                      الوقت {expense.time && <span className="text-[10px] font-normal text-[#1D9E75]/60">من الرسالة</span>}
-                    </label>
-                    <input type="time" value={expense.time}
-                      onChange={(e) => setExpense((p) => ({ ...p, time: e.target.value }))}
-                      className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2"
-                    />
-                  </div>
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">التاريخ</label>
+                  <input type="date" value={expense.date}
+                    onChange={(e) => setExpense((p) => ({ ...p, date: e.target.value }))}
+                    className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-[#1D9E75]">
+                    الوقت {expense.time && <span className="text-[10px] font-normal text-[#1D9E75]/60">من الرسالة</span>}
+                  </label>
+                  <input type="time" value={expense.time}
+                    onChange={(e) => setExpense((p) => ({ ...p, time: e.target.value }))}
+                    className="w-full rounded-xl border border-[#1D9E75]/30 p-3 text-sm text-gray-900 outline-none ring-[#1D9E75] focus:ring-2"
+                  />
                 </div>
 
                 <div>
