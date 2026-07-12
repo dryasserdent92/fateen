@@ -19,7 +19,6 @@ export async function POST(req: NextRequest) {
     store?: string | null;
     amount?: number;
     date?: string;
-    time?: string | null;
     category?: string;
     item_name?: string | null;
     item_brand?: string | null;
@@ -28,7 +27,6 @@ export async function POST(req: NextRequest) {
       store?: string | null;
       amount?: number;
       date?: string;
-      time?: string | null;
       category?: string;
       item_name?: string | null;
       item_brand?: string | null;
@@ -46,7 +44,7 @@ export async function POST(req: NextRequest) {
   let rows: Array<Record<string, unknown>>;
   try {
     rows = payloadExpenses.map((expense) => {
-      const { store, amount, date, time, category, item_name, item_brand, items } = expense;
+      const { store, amount, date, category, item_name, item_brand, items } = expense;
       if (typeof amount !== "number" || isNaN(amount) || amount <= 0) {
         throw new Error("INVALID_AMOUNT");
       }
@@ -58,7 +56,6 @@ export async function POST(req: NextRequest) {
         store:      store      ?? null,
         amount,
         date:       date       ?? new Date().toISOString().split("T")[0],
-        time:       time       ?? null,
         category:   category   ?? "أخرى",
         item_name:  item_name  ?? null,
         item_brand: item_brand ?? null,
