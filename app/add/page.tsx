@@ -17,8 +17,8 @@ const STEPS: Step[] = ["input", "review", "saved"];
 const STEP_LABELS = ["إدخال", "مراجعة", "حفظ"];
 
 const INPUT_TABS: { id: InputMethod; label: string; icon: string }[] = [
-  { id: "image", label: "صورة", icon: "📷" },
   { id: "sms",   label: "SMS",   icon: "💬" },
+  { id: "image", label: "صورة", icon: "📷" },
   { id: "voice", label: "صوت",   icon: "🎤" },
 ];
 
@@ -91,7 +91,7 @@ function AddExpenseInner() {
   const searchParams = useSearchParams();
 
   const [step, setStep]             = useState<Step>("input");
-  const [method, setMethod]         = useState<InputMethod>("image");
+  const [method, setMethod]         = useState<InputMethod>("sms");
 
   /* image */
   const [file, setFile]             = useState<File | null>(null);
