@@ -21,7 +21,6 @@ type Expense = {
   store: string | null;
   amount: number | null;
   date: string | null;
-  time: string | null;
   category: string | null;
   item_name: string | null;
   item_brand: string | null;
@@ -161,7 +160,7 @@ export default function ExpensesPage() {
 
     const { data, error: fetchError } = await supabase
       .from("expenses")
-      .select("id,store,amount,date,time,category,item_name,item_brand,items")
+      .select("id,store,amount,date,category,item_name,item_brand,items")
       .eq("user_id", user.id)
       .order("date", { ascending: false });
     if (fetchError) {
@@ -472,15 +471,6 @@ export default function ExpensesPage() {
     acc[day]!.push(e);
     return acc;
   }, {});
-  /* ترتيب داخلي: الأصناف التي لها وقت تُرتَّب تنازلياً، ثم بدون وقت */
-  Object.values(dayGroups).forEach(group => {
-    group.sort((a, b) => {
-      if (a.time && b.time) return b.time.localeCompare(a.time); // كلاهما له وقت → الأحدث أولاً
-      if (a.time) return -1; // a له وقت → يجيء أولاً
-      if (b.time) return 1;  // b له وقت → يجيء أولاً
-      return 0;
-    });
-  });
   const sortedDays = Object.keys(dayGroups).sort((a, b) => b.localeCompare(a));
 
   /* تقييم حي في نافذة التعديل */
@@ -1075,11 +1065,6 @@ export default function ExpensesPage() {
                             )}
                             <p className="mt-0.5 text-xs text-gray-400">
                               {expense.category ?? "-"} · {formatDate(expense.date)}
-                              {expense.time && (
-                                <span className="mr-1 inline-flex items-center gap-0.5 rounded-md bg-[#1D9E75]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#1D9E75]">
-                                  🕐 {expense.time}
-                                </span>
-                              )}
                             </p>
                           </div>
 
